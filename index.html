@@ -213,6 +213,8 @@ details.fold[open]>summary::after{content:" 접기"}
 <script src="data/gent.js"></script>
 <script src="data/people.js"></script>
 <script src="data/succ.js"></script>
+<script src="data/chain.js"></script>
+<script src="data/subway.js"></script>
 <script>
 const S = window.SUM, NY = S.y1 - S.y0 + 1, $ = id => document.getElementById(id);
 const KSIC = {56111:'한식 일반',56112:'한식 면요리',56113:'한식 육류요리',56114:'한식 해산물요리',56121:'중식',56122:'일식',56123:'서양식',56129:'기타 외국식',56130:'구내식당',56141:'출장 음식',56142:'이동 음식',56191:'제과점',56192:'피자·햄버거·샌드위치',56193:'치킨',56194:'김밥·간이음식',56199:'간이음식 포장판매',56211:'일반 유흥주점',56212:'무도 유흥주점',56213:'생맥주 전문점',56219:'기타 주점',56221:'커피 전문점',56229:'기타 비알코올 음료점'};
@@ -560,6 +562,29 @@ function renderCompare(){ const ds = st.cmp, U = st.U, A = ds.map(d => agg([d], 
     + `<h3>나란히 본 연도별 개업·폐업</h3><div class="grid2">${ds.map((d, i) => `<div><div class="sub" style="font-weight:600;color:var(--ink)">${esc(S.dong[d][0])}</div>${yearly(A[i].op, A[i].cl)}</div>`).join('')}</div></div>`;
   $('panel').innerHTML = h; }
 
+const SW = window.SUBWAY || {p:[], s:[]};
+function subwayBlock(lat, lon, R, title){ if (!SW.s.length || lat == null) return ''; const k = Math.cos(lat*Math.PI/180), near = [];
+  for (const t of SW.s){ const dy = (t[1]-lat)*111320, dx = (t[2]-lon)*111320*k, d = Math.sqrt(dx*dx + dy*dy); if (d <= R) near.push([d, t]); }
+  near.sort((a, b) => a[0]-b[0]);
+  if (!near.length) return `<h3>${title}</h3><div class="note" style="margin-top:0">직선거리 ${(R/1000).toFixed(1)}km 안에 지하철역이 없습니다.</div>`;
+  return `<h3>${title}</h3><table><thead><tr><th>역</th><th>호선</th><th>직선거리</th><th>하루 승하차</th></tr></thead><tbody>` + near.slice(0, 4).map(([d, t]) => `<tr style="cursor:default"><td>${esc(t[0])}</td><td><span class="sub">${esc(t[4].join(', '))}</span></td><td>${Math.round(d/10)*10}m${d <= 400 ? ' <span class="sub">걸어서 5분쯤</span>' : ''}</td><td>${t[3] ? num(t[3]) + '명' : '<span class="sub">자료 없음</span>'}</td></tr>`).join('') + '</tbody></table>'; }
+// ===== 6. 체인과 개인 가게, 건물 정보
+const CH = window.CHAIN || {r:{}};
+function chainBlock(U){ const R = CH.r[st.reg], e = R && R.u[U]; if (!e) return ''; const yr = R.yr, n = yr.length, W = 448, H = 110, ML = 34, MR = 34, T = 12, v = yr.map(a => a[1] ? a[0]/a[1] : 0), top = Math.ceil(Math.max(...v)*10)/10 || .1, x = i => ML + i*(W-ML-MR)/(n-1), y = q => T + (1 - q/top)*(H-T);
+  let g = `<svg viewBox="0 0 ${W} ${H+18}" width="100%" role="img" aria-label="개업 중 체인 비중">`; for (const q of [0, top/2, top]) g += `<line x1="${ML}" x2="${W-MR}" y1="${y(q)}" y2="${y(q)}" stroke="var(--line)"/><text class="mut" x="${ML-5}" y="${y(q)+4}" text-anchor="end">${Math.round(q*100)}%</text>`;
+  const pts = v.map((q, i) => x(i) + ' ' + y(q)).join('L'); g += `<path d="M${x(0)} ${y(0)}L${pts}L${x(n-1)} ${y(0)}z" fill="var(--accent)" opacity=".07"/><path d="M${pts}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"/>`;
+  v.forEach((q, i) => { g += `<circle cx="${x(i)}" cy="${y(q)}" r="${i === n-1 ? 3.5 : 2.5}" fill="var(--accent)" stroke="var(--card)" stroke-width="1.5"><title>${S.y0+i}년 개업 ${yr[i][1].toLocaleString()}곳 중 체인 ${yr[i][0].toLocaleString()}곳 (${pct(q)})</title></circle><text class="mut" x="${x(i)}" y="${H+13}" text-anchor="middle">'${String(S.y0+i).slice(2)}</text>`; });
+  g += `<text x="${x(n-1)+6}" y="${y(v[n-1])+4}" style="font-size:10.5px;font-weight:600">${pct(v[n-1])}</text></svg>`;
+  const d = e.c[1] && e.i[1] ? e.c[0]/e.c[1] - e.i[0]/e.i[1] : null;
+  return `<div><h3>체인과 개인 가게의 3년 생존율 · ${esc(uName())}</h3><div class="prs">${rateBar('체인으로 보이는 가게', e.c[0], e.c[1])}${rateBar('개인 가게', e.i[0], e.i[1])}</div><div class="note">${d == null ? '' : `체인으로 보이는 가게가 ${Math.abs(d*100).toFixed(0)}%p ${d > 0 ? '높습니다' : '낮습니다'}. `}같은 상호가 ${CH.min}곳 이상이면 체인으로 본 추정입니다. ${esc(rName())}에서 영업 중인 음식점의 ${pct(R.now[0]/R.now[1])}가 여기에 해당합니다.</div></div>`
+    + `<div><h3>새로 여는 가게 중 체인 비중 · ${esc(rName())} 음식점 전체</h3>${g}<div class="note">지금 가장 많은 상호: ${R.top.slice(0, 8).map(t => esc(t[0]) + ' ' + t[1].toLocaleString()).join(', ')}</div></div>`; }
+window.BLD = window.BLD || {}; const bldLoad = {};
+function bldBlock(b){ const g = st.gu; if (!g || g.slice(0, 2) !== '11') return '';
+  if (!BLD[g]){ if (!bldLoad[g]){ bldLoad[g] = 1; const sc = document.createElement('script'); sc.src = `data/bld_${g}.js`; sc.onload = () => { if (st.tab === 'spot' && st.gu === g){ const y = $('panel').scrollTop; render(); $('panel').scrollTop = y; } }; document.head.appendChild(sc); } return ''; }
+  const e = BLD[g][b[0]]; if (!e) return `<h3>건물 정보</h3><div class="note" style="margin-top:0">건축물대장에서 이 주소의 건물을 찾지 못했습니다.</div>`;
+  const age = e[0] ? Math.floor(S.cut/10000) - e[0] : null;
+  return `<h3>건물 정보</h3><div class="kpis">${kpi('사용승인', e[0] ? e[0] + '년' : '–', age != null ? `지은 지 ${age}년` : '대장에 날짜 없음')}${kpi('규모', `지상 ${e[1]}층${e[2] ? ' · 지하 ' + e[2] + '층' : ''}`, `연면적 ${e[3].toLocaleString()}㎡`)}${kpi('주차', e[5] ? e[5].toLocaleString() + '대' : '없음', `승강기 ${e[6] ? e[6] + '대' : '없음'}`)}</div><div class="note">주용도 ${esc(e[4] || '–')} · ${esc(e[7] || '')}. 건축물대장에 적힌 값이라 실제 주차 가능 대수와 다를 수 있습니다.</div>`; }
+
 // ===== 1. 지역 찾기
 function renderRegion(){ paintDongs();
   const m = st.metric, list = DONGS.filter(d => !st.gu || S.dong[d][1] === st.gu).map(d => { const a = agg([d], st.U), s = saleAgg([d], st.U); return {d, a, s, now:a.now, surv:a.n >= MINN ? a.rate : null, net:a.net, open1:a.op[NY-1], close1:a.cl[NY-1], crate:metricOf(a, null, 'crate', d), sale:s ? s.per : null, yoy:s ? s.yoy : null, pop:metricOf(a, null, 'pop', d), ppl:metricOf(a, null, 'ppl', d), rent:dongRent(d), burden:metricOf(a, s, 'burden', d)}; });
@@ -570,7 +595,7 @@ function renderRegion(){ paintDongs();
   if (st.dong && S.st[st.dong]){ const di = S.dong[st.dong], a = agg([st.dong], st.U), s = saleAgg([st.dong], st.U), rank = list.findIndex(x => x.d === st.dong);
     h += `<h2>${esc(di[0])} <span class="sub">${esc(S.gu[di[1]] || '')}</span></h2><div class="sub">${esc(uName())}${rank >= 0 ? ` · ${MLAB[key]} 기준 ${scope} ${list.length}개 동 중 ${rank+1}위` : ''}</div>
       <div class="kpis" style="margin-top:10px">${kpi('영업 중', a.now.toLocaleString() + '곳', `최근 3년 ${sgn(a.net)}`)}${kpiS('3년 생존율', a, `${scope} ${pct(tot.rate)}`)}${kpi('점포당 월매출', s ? won(s.per) : '–', s ? `2025년 · 전년 대비 ${spct(s.yoy)}` : '이 종목은 매출 분류 없음')}</div>
-      ${burdenNote(st.dong, s)}<div style="margin:10px 0 0"><button class="btn" data-cmp="${st.dong}" type="button">${st.cmp.includes(st.dong) ? '비교에서 빼기' : '비교에 담기'}</button></div>${yearly(a.op, a.cl)}${saleBlock(s, esc(catName(st.U)))}${popBlock(st.dong)}${peopleBlock(st.dong)}${fitBlock(st.dong)}${RT.dong[st.dong] ? rentBlock(RT.dong[st.dong].slice(0, 4).map(x => [x[0], `동 면적의 ${Math.round(x[1]*100)}%`]), '임대료·공실률 · 이 동네에 걸친 상권') : rentBlock([], '임대료·공실률', '이 동네는 한국부동산원 조사 상권에 들어 있지 않아 지역 평균만 보여 드립니다.')}<div style="margin:12px 0 4px"><button class="btn pri" data-spot="${st.dong}">이 동네에서 자리 진단하기</button></div>`;
+      ${burdenNote(st.dong, s)}<div style="margin:10px 0 0"><button class="btn" data-cmp="${st.dong}" type="button">${st.cmp.includes(st.dong) ? '비교에서 빼기' : '비교에 담기'}</button></div>${yearly(a.op, a.cl)}${saleBlock(s, esc(catName(st.U)))}${popBlock(st.dong)}${peopleBlock(st.dong)}${subwayBlock(S.dong[st.dong][2], S.dong[st.dong][3], 1500, '지하철역 · 동네 중심에서')}${fitBlock(st.dong)}${RT.dong[st.dong] ? rentBlock(RT.dong[st.dong].slice(0, 4).map(x => [x[0], `동 면적의 ${Math.round(x[1]*100)}%`]), '임대료·공실률 · 이 동네에 걸친 상권') : rentBlock([], '임대료·공실률', '이 동네는 한국부동산원 조사 상권에 들어 있지 않아 지역 평균만 보여 드립니다.')}<div style="margin:12px 0 4px"><button class="btn pri" data-spot="${st.dong}">이 동네에서 자리 진단하기</button></div>`;
     if (a.n < MINN) h += `<div class="note">이 동네는 해당 종목의 표본(${a.n}곳)이 적어 생존율이 크게 흔들립니다.</div>`;
   } else h += `<h2>${esc(scope)} · ${esc(uName())}</h2><div class="sub">지도에서 동네를 누르거나 아래 표에서 고르세요.</div>
       <div class="kpis" style="margin-top:10px">${kpi('영업 중', tot.now.toLocaleString() + '곳', `최근 3년 ${sgn(tot.net)}`)}${kpiS('3년 생존율', tot)}${kpi('행정동', list.length + '곳', '')}</div>`;
@@ -646,7 +671,7 @@ function renderSpot(){ if (!st.gu){ setLegend('주소를 검색하거나 지도�
     h += `<div class="note" style="margin:0 0 8px">호 단위는 기록이 적어 판정이 ‘보류’로 나오기 쉽습니다. 주소에 호가 적히지 않은 기록은 ‘호 미상’으로 묶입니다.</div>`; }
   h += `<div class="verdict ${v[0]}"><span class="stamp">${{warn:'주의', hold:'보류', ok:'양호'}[v[0]]}</span><div><b>${v[1]}</b><p>${v[2]}</p></div></div><div class="kpis">${kpi('2010년 이후 개업', recent.length + '곳', `현재 영업 ${openNow}곳${pops ? ' · 단기 ' + pops + '건 제외' : ''}`)}${kpiS('이 자리 3년 생존율', sS)}${kpiS(`주변 ${R}m 3년 생존율`, sN)}</div>`;
   h += `<div class="note">${esc(S.gu[st.gu])} 전체 음식점 3년 생존율은 ${pct(sA.rate)}입니다 (${sA.n.toLocaleString()}곳).</div>`;
-  h += '<h3>이 자리의 이력 (2010년 이후)</h3>' + timeline(spot) + succSpot(spot);
+  h += '<h3>이 자리의 이력 (2010년 이후)</h3>' + timeline(spot) + succSpot(spot) + bldBlock(b) + subwayBlock(b[1], b[2], 1500, '가까운 지하철역');
   h += `<h3>주변 ${R}m · ${esc(uName())}</h3><div class="kpis">${kpi('현재 영업 중 (경쟁점)', compet + '곳', `건물 ${nearB.length}곳 안`)}${kpiS('3년 생존율', sNU, dA && dA.n >= MINN ? `동 전체 ${pct(dA.rate)}` : '')}${kpi('영업기간 중앙값', yrs(kmN), `${rName()} ${yrs(seoulKm)}`)}</div>`;
   const op = new Array(NY).fill(0), cl = new Array(NY).fill(0); for (const r of nearU){ if (isPopup(r)) continue; const a = Math.floor(r[3]/10000) - S.y0, z = Math.floor(r[4]/10000) - S.y0; if (a >= 0 && a < NY) op[a]++; if (r[4] > 1 && z >= 0 && z < NY) cl[z]++; }
   h += yearly(op, cl) + spotRent(b) + dongSales(b[5], U) + (b[5] ? popBlock(b[5]) + peopleBlock(b[5]) : '') + spotSales(G, b, U, R) + (others.length ? `<div class="note">구 경계 근처라 ${others.map(g => esc(S.gu[g])).join('·')}의 가게도 주변 비교에 포함했습니다${waiting.length ? ' (이웃 구 자료를 불러오는 중이라 잠시 뒤 수치가 바뀝니다)' : ''}. 2021년 블록 단위 매출만은 선택한 구 안의 구역으로 계산합니다.</div>` : '') + '</div>';
@@ -706,7 +731,7 @@ function renderTrend(){ const U = st.U, a = agg(DONGS, U), all = agg(DONGS, -1),
   h += `<div><h3>연도별 개업·폐업</h3>${yearly(a.op, a.cl, 540)}</div>`;
   h += `<div><h3>개업 연도별 3년 생존율 (그해 문 연 가게가 3년 뒤에도 영업한 비율)</h3>${se[1].length ? cohort(se[1], U >= 0 && KMR()[-1] ? KMR()[-1][1] : null) : '<div class="sub">자료 없음</div>'}</div>`;
   const rows = S.upt.map((u, i) => ({i, u, a:uptTot[i], km:KMR()[i] ? KMR()[i][0] : null})).filter(x => x.a.now >= (st.reg === 'seoul' ? 200 : 30)).sort((x, y) => y.a.now - x.a.now);
-  h += succBlock(U);
+  h += succBlock(U) + chainBlock(U);
   h += `<div><h3>종목별 비교 (행을 누르면 그 종목으로 바뀝니다)</h3><div class="scroll"><table><thead><tr><th>종목</th><th>영업 중</th><th>${S.y1} 개업</th><th>${S.y1} 폐업</th><th>3년 순증감</th><th>3년 생존율</th><th>영업기간</th></tr></thead><tbody>`
     + rows.map(x => `<tr data-u="${x.i}" class="${x.i === U ? 'pick' : ''}"><td>${esc(x.u)}</td><td>${num(x.a.now)}</td><td>${num(x.a.op[L1])}</td><td>${num(x.a.cl[L1])}</td><td>${sgn(x.a.net)}</td><td>${pct(x.a.rate)}</td><td>${yrs(x.km)}</td></tr>`).join('') + '</tbody></table></div>'
     + src('종목은 인허가 대장의 ‘업태’ 분류입니다. 신고할 때 고른 값이라 ‘기타’가 많고, 실제 메뉴와 다를 수 있습니다.') + '</div>';
@@ -731,9 +756,12 @@ const SRCS = {
   pop: ['유동인구', ['서울시 상권분석서비스 ‘길단위인구-행정동’ (서울 열린데이터광장)', '2021년 1분기 ~ 2026년 2분기 분기 합계', '사람 수를 직접 센 값이 아닌 추정치입니다', '서울만 있습니다 (수원·화성 없음)']],
   rent: ['임대료·공실률', ['한국부동산원 ‘상업용부동산 임대동향조사’ 상가 통계표와 상권 구획도 (R-ONE 공표보고서)', `${RT.q[RQ-1].replace('.', '년 ').replace('Q', '분기')} 공표 · 최근 8개 분기`, '조사 대상 상권의 표본 건물 평균이라 개별 점포의 실제 임대료와 다를 수 있습니다']],
   people: ['상주인구·직장인구', ['서울시 상권분석서비스 ‘상주인구-행정동’, ‘직장인구-행정동’ (서울 열린데이터광장)', `${PE.q[0] ? PE.q[0].slice(0, 4) + '년 ' + PE.q[0][4] + '분기' : ''} 기준`, '주민등록과 사업체 자료를 바탕으로 한 추정치입니다', '서울만 있습니다 (수원·화성 없음)']],
+  subway: ['지하철역 승하차', ['서울시 ‘지하철호선별 역별 승하차 인원 정보’와 ‘역사마스터 정보’ (서울 열린데이터광장)', `${SW.p[0] ? SW.p[0].slice(0, 4) + '년 ' + (+SW.p[0].slice(4)) + '월 ~ ' + SW.p[1].slice(0, 4) + '년 ' + (+SW.p[1].slice(4)) + '월' : ''}의 승차와 하차를 더해 하루 평균으로 나눴고, 환승역은 호선을 합쳤습니다`, '신분당선, GTX-A, 인천 지하철 등은 승하차 자료가 없어 위치만 나옵니다', '거리는 직선거리입니다']],
+  bld: ['건물 정보', ['국토교통부 건축물대장 표제부 (건축데이터 개방, 서울)', '인허가 주소의 도로명·건물번호 또는 지번으로 대장을 찾았고, 한 주소에 여러 동이 있으면 연면적이 가장 큰 주건축물을 보여 줍니다', '서울 음식점 건물의 84%에서 찾았습니다']],
+  chain: ['체인 추정', [`공식 가맹점 목록이 아니라, 지점 표시를 뗀 상호가 서울·수원·화성에 ${(window.CHAIN || {}).min || 30}곳 이상 있으면 체인으로 보았습니다`, '‘전주식당’처럼 여러 가게가 흔히 쓰는 이름은 뺐지만 일부는 섞여 있을 수 있습니다', '편의점(휴게음식점 인허가)도 포함됩니다']],
   gg: ['경기도 카드매출', ['경기데이터드림 ‘카드매출 행정동 집계’의 외식 업종 합계', '수원은 2026년 8월까지, 화성은 2025년 12월까지 있습니다', '동네 변화 탭의 매출 변화율 계산에만 썼습니다']],
   bc: ['(예시) 블록 단위 카드매출', ['2021년 블록 단위 카드매출 표본', '일부 카드사 결제분만 담은 표본이라 지금의 실제 매출을 나타내지 않습니다']] };
-const srcKeys = t => /잘 버티는|나란히/.test(t) ? (st.reg === 'seoul' ? ['permit', 'people', 'sales', 'rent'] : ['permit', 'rent']) : /단계|신호/.test(t) ? (st.reg === 'seoul' ? ['permit', 'pop', 'sales', 'rent'] : ['permit', 'gg', 'rent']) : /카드매출/.test(t) ? ['bc'] : /동네 순위/.test(t) ? ['permit', 'sales', 'pop', 'rent'] : /자치구별/.test(t) ? ['permit', 'sales'] : /배후 인구|상주|직장인구/.test(t) ? ['people'] : /점포당 유동인구/.test(t) ? ['pop', 'permit'] : /임대료|공실/.test(t) ? ['rent'] : /유동인구/.test(t) ? ['pop'] : /매출/.test(t) ? ['sales'] : ['permit'];
+const srcKeys = t => /지하철/.test(t) ? ['subway'] : /건물 정보/.test(t) ? ['bld'] : /체인/.test(t) ? ['chain', 'permit'] : /잘 버티는|나란히/.test(t) ? (st.reg === 'seoul' ? ['permit', 'people', 'sales', 'rent'] : ['permit', 'rent']) : /단계|신호/.test(t) ? (st.reg === 'seoul' ? ['permit', 'pop', 'sales', 'rent'] : ['permit', 'gg', 'rent']) : /카드매출/.test(t) ? ['bc'] : /동네 순위/.test(t) ? ['permit', 'sales', 'pop', 'rent'] : /자치구별/.test(t) ? ['permit', 'sales'] : /배후 인구|상주|직장인구/.test(t) ? ['people'] : /점포당 유동인구/.test(t) ? ['pop', 'permit'] : /임대료|공실/.test(t) ? ['rent'] : /유동인구/.test(t) ? ['pop'] : /매출/.test(t) ? ['sales'] : ['permit'];
 const srcBox = keys => `<div class="srcbox">${keys.map(k => `<b>${SRCS[k][0]}</b><ul>${SRCS[k][1].map(x => `<li>${x}</li>`).join('')}</ul>`).join('')}</div>`;
 function addSrcButtons(){ for (const el of $('panel').querySelectorAll('h3, details.fold>summary, .kpi .l')){ if (el.querySelector('.srcb')) continue;
     const k = srcKeys(el.textContent), kp = el.classList.contains('l'), b = document.createElement('button'); b.type = 'button'; b.className = 'srcb' + (kp ? ' mini' : ''); b.dataset.src = k.join(','); b.textContent = kp ? 'i' : '출처'; b.title = '어디서 가져온 자료인지 보기'; b.setAttribute('aria-label', '자료 출처 보기'); el.classList.add('hsrc'); el.appendChild(b); }
