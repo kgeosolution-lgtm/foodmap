@@ -484,13 +484,13 @@ function spotRent(b){ const k = areaAt(b[2], b[1]);
   const l = b[5] && RT.dong[b[5]];
   return l ? rentBlock(l.slice(0, 3).map(x => [x[0], '']), '임대료·공실률 · 같은 동에 걸친 상권', '이 자리는 조사 상권 구획 밖입니다. 같은 동네에 걸친 상권의 수치를 참고로 보여 드립니다.')
            : rentBlock([], '임대료·공실률', '이 자리와 동네는 한국부동산원 조사 상권에 들어 있지 않아 서울 평균만 보여 드립니다.'); }
-function spotSales(G, b, U, R){ if (!G.sales || !Object.keys(G.sales).length) return '';   // 공개용 묶음에는 2021년 BC카드 자료가 없다
+function spotSales(G, b, U, R){ if (!G.sales || !Object.keys(G.sales).length) return '';   // 자료를 뺀 묶음에서는 블록을 숨긴다
   if (!G.cen){ G.cen = {}; G.b.forEach(o => { if (!o[3]) return; const c = G.cen[o[3]] || (G.cen[o[3]] = [0, 0, 0]); c[0] += o[1]; c[1] += o[2]; c[2]++; }); }
   const suds = new Set([b[3]]); for (const s in G.cen){ const c = G.cen[s]; if (distM(b, [0, c[0]/c[2], c[1]/c[2]]) <= R) suds.add(s); }
   const ag = {}; let nS = 0;
   for (const s of suds){ const d = G.sales[s]; if (!d) continue; nS++; for (const k in d){ const e = d[k], a = ag[k] || (ag[k] = {mct:0, amt:0, cnt:0, g:[0,0], a:[0,0,0,0,0,0], t:[0,0,0,0,0,0], d:[0,0,0,0,0,0,0]});
     a.mct += e[0].reduce((x, y) => x+y, 0); a.amt += e[1].reduce((x, y) => x+y, 0); a.cnt += e[2]; e[3].forEach((v, i) => a.g[i] += v); e[4].forEach((v, i) => a.a[i] += v); e[5].forEach((v, i) => a.t[i] += v); e[6].forEach((v, i) => a.d[i] += v); } }
-  let h = `<details class="fold"><summary>참고: 2021년 블록 단위 카드매출</summary><div class="note" style="margin:0 0 8px">BC카드 결제분, 주변 ${R}m 안 ${nS}개 구역</div>`; const ks = Object.keys(ag).sort((x, y) => ag[y].amt - ag[x].amt);
+  let h = `<details class="fold"><summary>참고: 2021년 블록 단위 카드매출 (샘플데이터)</summary><div class="note" style="margin:0 0 8px">샘플데이터입니다. BC카드 결제분, 주변 ${R}m 안 ${nS}개 구역</div>`; const ks = Object.keys(ag).sort((x, y) => ag[y].amt - ag[x].amt);
   if (!ks.length) return h + '<div class="sub">이 주변은 매출 자료가 없습니다.</div></details>';
   const pick = st.K && ag[st.K] ? st.K : (U >= 0 && ag[U2K[S.upt[U]]] ? U2K[S.upt[U]] : +ks[0]);
   h += '<table><thead><tr><th>업종</th><th>가맹점(월평균)</th><th>연 매출</th><th>점포당 월 매출</th><th>건당</th></tr></thead><tbody>'
