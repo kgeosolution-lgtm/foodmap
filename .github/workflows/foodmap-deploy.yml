@@ -33,3 +33,32 @@ jobs:
           $n = (Get-ChildItem -LiteralPath $target -Recurse -File | Where-Object { $_.FullName -notmatch '\\\.git\\' }).Count
           "DEPLOYED files=$n commit=$env:GITHUB_SHA"
           exit 0
+      - name: One-off check of leftovers on the server (temporary)
+        shell: powershell
+        run: |
+          $ProgressPreference = 'SilentlyContinue'
+          $target = 'D:\codesolution\kgeodata\foodmap'
+          $out = @()
+          $q = cmd /c 'schtasks /Query /TN "foodmap-autopull" /FO LIST 2>&1'
+          if ($LASTEXITCODE -eq 0) {
+            $d = cmd /c 'schtasks /Delete /TN "foodmap-autopull" /F 2>&1'
+            $out += "task foodmap-autopull: FOUND -> delete exit=$LASTEXITCODE $d"
+          } else { $out += "task foodmap-autopull: none" }
+          $other = cmd /c 'schtasks /Query /FO CSV /NH 2>nul' | Where-Object { $_ -match 'foodmap' }
+          $out += "other tasks mentioning foodmap: " + $(if ($other) { ($other -join ' | ') } else { 'none' })
+          foreach ($scope in '--system', '--global') {
+            $s = cmd /c "git config $scope --get-all safe.directory 2>nul" | Where-Object { $_ -match 'foodmap' }
+            if ($s) {
+              cmd /c "git config $scope --unset-all safe.directory `"^D:/codesolution/kgeodata/foodmap$`" 2>&1" | Out-Null
+              $out += "git safe.directory ($scope): FOUND -> unset exit=$LASTEXITCODE"
+            } else { $out += "git safe.directory ($scope): none" }
+          }
+          $g = Join-Path $target '.git'
+          if (Test-Path -LiteralPath $g) {
+            $mb = [math]::Round(((Get-ChildItem -LiteralPath $g -Recurse -Force -File | Measure-Object Length -Sum).Sum / 1MB), 1)
+            Remove-Item -LiteralPath $g -Recurse -Force -ErrorAction SilentlyContinue
+            $out += ".git folder in site: FOUND ${mb}MB -> removed=" + (-not (Test-Path -LiteralPath $g))
+          } else { $out += ".git folder in site: none" }
+          $out | Set-Content -LiteralPath (Join-Path $target 'server-check.txt') -Encoding UTF8
+          $out
+          exit 0
