@@ -154,7 +154,8 @@ tr.hov td{background:var(--weak)}
 .gstamp{flex:none;font-size:16px;font-weight:700;letter-spacing:.06em;padding:6px 10px;border:3px solid currentColor;border-radius:5px;transform:rotate(-4deg)}
 .rank{display:inline-block;width:84px;height:6px;border-radius:3px;background:var(--weak);vertical-align:middle;margin-right:8px;overflow:hidden}.rank div{height:100%;background:var(--accent);border-radius:3px}
 button.back{font:inherit;font-size:12.5px;color:var(--accent);background:none;border:0;padding:0;margin:0 0 10px;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
-tr.gup td{background:color-mix(in srgb,#e8662f 7%,var(--card))}
+tr.gup td{background:color-mix(in srgb,#e0412b 6%,var(--card))}
+tr[data-area]{cursor:pointer}tr.apick td{box-shadow:inset 0 -2px #e0412b}
 @media (max-width:900px){.gstages{grid-template-columns:repeat(2,1fr)}}
 details.src{margin-top:10px;font-size:12.5px;color:var(--sub)}
 details.src>summary{cursor:pointer;display:inline-block;text-decoration:underline dotted;text-underline-offset:3px}
@@ -430,15 +431,20 @@ function render(){ document.body.className = st.tab;
   $('reg').value = st.reg; $('gu').value = st.gu;
   $('gu').options[0].textContent = st.tab === 'spot' ? '구를 고르세요' : rName() + ' 전체';
   $('tip').style.display = 'none';
-  if (view){ dongLayer.visible = isDongTab(st.tab); spotLayer.visible = st.tab === 'spot'; rentLayer.visible = st.tab === 'spot' || (st.tab === 'region' && st.metric === 'rent'); if (st.tab !== 'spot') selLayer.removeAll(); }
+  if (view){ dongLayer.visible = isDongTab(st.tab); spotLayer.visible = st.tab === 'spot'; rentLayer.visible = st.tab === 'spot' || st.tab === 'gent' || (st.tab === 'region' && st.metric === 'rent'); if (st.tab !== 'gent' && st.garea != null){ st.garea = null; focusArea(-1, false); } if (st.tab !== 'spot') selLayer.removeAll(); }
   ({region:renderRegion, spot:renderSpot, trend:renderTrend, gent:renderGent})[st.tab](); }
 
 // ===== 4. 동네 변화 (뜨는 중 / 임대료 급등 / 밀려나는 중 / 식는 중)
 const GT = window.GENT, isDongTab = t => t === 'region' || t === 'gent';
-const STG = {push:['밀려나는 중', '#8f2d1b', '뜨거나 임대료가 오른 뒤, 오래된 가게의 폐업이 늘어난 동네'], rent:['임대료 급등', '#e8662f', '상권 임대료가 시도 평균보다 유난히 빠르게 오르는 동네'], hot:['뜨는 중', '#f3bf82', '개업이 늘고 유행 업종·사람·매출이 함께 늘어나는 동네'], cold:['식는 중', '#7c93ab', '개업이 줄고 사람·매출도 함께 빠지는 동네'], calm:['큰 변화 없음', '#dfe4e9', ''], na:['자료 부족', '#c9d0d6', '']}, SORDER = ['push', 'rent', 'hot', 'cold', 'calm', 'na'];
+const STG = {push:['밀려나는 중', '#5a2a52', '뜨거나 임대료가 오른 뒤, 오래된 가게의 폐업이 늘어난 동네'], rent:['임대료 급등', '#e0412b', '상권 임대료가 시도 평균보다 유난히 빠르게 오르는 동네'], hot:['뜨는 중', '#f4a62a', '개업이 늘고 유행 업종·사람·매출이 함께 늘어나는 동네'], cold:['식는 중', '#3d7fc6', '개업이 줄고 사람·매출도 함께 빠지는 동네'], calm:['큰 변화 없음', '#dfe4e9', ''], na:['자료 부족', '#c9d0d6', '']}, SORDER = ['push', 'rent', 'hot', 'cold', 'calm', 'na'];
+const gHas = () => DONGS.some(d => GT.d[d] && (GT.d[d].pop != null || GT.d[d].sale != null));
 const gd = c => GT.d[c] || {stage:'na'}, ppf = v => v == null ? '–' : (v > 0 ? '+' : '') + (v*100).toFixed(1) + '%p', GTN = {small:'소규모', mid:'중대형'};
 const chip = sg => `<span class="chip"><i style="background:${STG[sg][1]}"></i>${STG[sg][0]}</span>`;
-function paintGent(){ hovDong = null; if (!dongLayer) return; let top = null; dongLayer.graphics.forEach(g => { if (g.attributes.c === st.dong) top = g; g.symbol = dongSym(g.attributes.c, false); }); if (top) dongLayer.graphics.reorder(top, dongLayer.graphics.length - 1);
+const ASYM = on => ({type:'simple-fill', color:on ? [224,65,43,.10] : [0,0,0,0], outline:on ? {color:[224,65,43,1], width:3} : {color:[22,32,42,.8], width:1.3, style:'dash'}});
+function focusArea(i, zoom){ if (!view || !rentLayer) return; rentLayer.graphics.forEach((g, k) => { g.symbol = ASYM(k === i); }); const g = i >= 0 && rentLayer.graphics.getItemAt(i);
+  if (g && zoom) view.goTo(g.geometry.extent.clone().expand(1.8), {duration:600, easing:'ease-in-out'}).catch(() => {}); }
+const zoomDongs = cs => { const gs = cs.map(c => dongG[c]).filter(Boolean); if (view && gs.length) view.goTo(gs.length === 1 ? gs[0].geometry.extent.clone().expand(3.2) : gs, {duration:600, easing:'ease-in-out'}).catch(() => {}); };
+function paintGent(){ hovDong = null; if (!dongLayer) return; focusArea(st.garea == null ? -1 : st.garea, false); let top = null; dongLayer.graphics.forEach(g => { if (g.attributes.c === st.dong) top = g; g.symbol = dongSym(g.attributes.c, false); }); if (top) dongLayer.graphics.reorder(top, dongLayer.graphics.length - 1);
   const cnt = {}; for (const d of DONGS) cnt[gd(d).stage] = (cnt[gd(d).stage] || 0) + 1;
   setLegend(`<b>${esc(rName())} · 동네 변화</b><br>` + SORDER.filter(k => cnt[k]).map(k => `<i style="background:${STG[k][1]}"></i>${STG[k][0]} ${cnt[k]}곳`).join('<br>')); }
 function rentLine(a, typ){ const A = a[typ].v, B = GT.avg[a.s][typ].v, n = A.length, i0 = A.findIndex(v => v != null); if (i0 < 0 || i0 > n-3) return '';
@@ -457,14 +463,15 @@ function gSignal(label, val, p, note, inv){ const w = p == null ? 0 : Math.round
 function renderGent(){ paintGent(); const [p0, p1, r0, r1] = GT.yr;
   if (st.dong && S.dong[st.dong] && DSET.has(st.dong)){ const d = st.dong, g = gd(d), sg = g.stage, a = g.area != null ? GT.areas[g.area] : null, x = a && a.x;
     let h = `<div class="wrap"><button class="back" data-gback type="button">← ${esc(rName())} 전체 목록</button><h2>${esc(S.dong[d][0])} <span class="sub">${esc(S.gu[S.dong[d][1]] || '')}</span></h2>`;
-    h += `<div class="gverdict"><span class="gstamp" style="color:${sg === 'calm' || sg === 'na' ? 'var(--sub)' : STG[sg][1] === '#f3bf82' ? '#b9741f' : STG[sg][1]}">${STG[sg][0]}</span><p>${sg === 'na' ? '최근 6년 개업이 너무 적거나 영업 중인 음식점이 20곳 미만이라 판단하지 않았습니다.' : sg === 'calm' ? '뜨는 신호, 임대료 급등, 밀려나는 신호 어느 쪽도 기준에 닿지 않았습니다.' : STG[sg][2] + '입니다.'}</p></div>`;
+    h += `<div class="gverdict"><span class="gstamp" style="color:${sg === 'calm' || sg === 'na' ? 'var(--sub)' : sg === 'hot' ? '#a86400' : STG[sg][1]}">${STG[sg][0]}</span><p>${sg === 'na' ? '최근 6년 개업이 너무 적거나 영업 중인 음식점이 20곳 미만이라 판단하지 않았습니다.' : sg === 'calm' ? '뜨는 신호, 임대료 급등, 밀려나는 신호 어느 쪽도 기준에 닿지 않았습니다.' : STG[sg][2] + '입니다.'}</p></div>`;
+    if (g.ci) h += `<div class="note" style="margin-top:2px">참고: 서울시 상권분석서비스의 상권변화지표(${GT.ciq.slice(0, 4)}년 ${GT.ciq[4]}분기)는 이 동네를 <b>${esc(g.ci)}</b>(으)로 분류합니다. 영업 중인 가게와 폐업한 가게의 평균 영업기간을 서울 평균과 견준 지표라 위 단계와 기준이 다릅니다.</div>`;
     if (sg !== 'na'){ h += `<h3>뜨는 신호 · ${r0}~${r1}년과 ${p0}~${p1}년 비교</h3><table><thead><tr><th>신호</th><th>값</th><th>${esc(rName())} 안 순위</th></tr></thead><tbody>`
         + gSignal('개업 증가', spct(g.open), g.p_open, `${num(g.opP)}곳 → ${num(g.opR)}곳`) + gSignal('유행 업종 비중 변화', ppf(g.trend), g.p_trend, g.trShare != null ? `최근 개업의 ${pct(g.trShare)}가 카페·디저트·양식·이국 음식` : '')
-        + (hasSales ? gSignal('유동인구 3년 변화', spct(g.pop), g.p_pop) + gSignal('추정매출 1년 변화', spct(g.sale), g.p_sale) : '') + '</tbody></table>';
+        + (gHas() ? (st.reg === 'seoul' ? gSignal('유동인구 3년 변화', spct(g.pop), g.p_pop) : '') + gSignal(st.reg === 'seoul' ? '추정매출 1년 변화' : '카드매출 1년 변화', spct(g.sale), g.p_sale, st.reg === 'seoul' ? '' : GT.gg.sale[st.reg]) : '') + '</tbody></table>';
       h += `<h3>밀려나는 신호</h3><table><thead><tr><th>신호</th><th>값</th><th>${esc(rName())} 안 순위</th></tr></thead><tbody>`
         + gSignal('3년 폐업률 변화', ppf(g.close), g.p_close, g.crP != null ? `${pct(g.crP)} → ${pct(g.crR)}` : '') + gSignal(`${GT.old}년 넘은 가게의 폐업률`, pct(g.old), g.p_old, g.oldN ? `${num(g.oldN)}곳 중 ${num(g.oldCl)}곳이 ${r0}~${r1}년에 폐업` : '') + '</tbody></table>'; }
     if (x){ const b = GT.avg[a.s][x.t];
-      h += `<h3>임대료 · ${esc(a.n)} 상권</h3><div class="kpis">${kpi('㎡당 월 임대료', rfmt(x.last), GTN[x.t] + ' 상가 1층')}${kpi('1년 상승률', spct(x.c1), `${a.s} 평균 ${spct(b.c1)} · 차이 ${ppf(x.x1)}`)}${kpi('3년 상승률', spct(x.c3), x.c3 == null ? '3년 전 조사값 없음' : `${a.s} 평균 ${spct(b.c3)} · 차이 ${ppf(x.x3)}`)}</div>${rentLine(a, x.t)}<div class="note">${g.rentUp ? `<b>급등 기준에 해당합니다.</b> ` : ''}기준: 1년 상승률이 ${a.s} 평균보다 ${GT.th.x1*100}%p 이상 높거나 3년 누적이 ${GT.th.x3*100}%p 이상 높을 때. 3년 상승률은 조사 표본이 바뀐 분기를 빼고 이어 붙였습니다.</div>`; }
+      h += `<h3>임대료 · ${esc(a.n)} 상권</h3><button class="back" data-area="${g.area}" type="button">지도에서 이 상권 범위 보기</button><div class="kpis">${kpi('㎡당 월 임대료', rfmt(x.last), GTN[x.t] + ' 상가 1층')}${kpi('1년 상승률', spct(x.c1), `${a.s} 평균 ${spct(b.c1)} · 차이 ${ppf(x.x1)}`)}${kpi('3년 상승률', spct(x.c3), x.c3 == null ? '3년 전 조사값 없음' : `${a.s} 평균 ${spct(b.c3)} · 차이 ${ppf(x.x3)}`)}</div>${rentLine(a, x.t)}<div class="note">${g.rentUp ? `<b>급등 기준에 해당합니다.</b> ` : ''}기준: 1년 상승률이 ${a.s} 평균보다 ${GT.th.x1*100}%p 이상 높거나 3년 누적이 ${GT.th.x3*100}%p 이상 높을 때. 3년 상승률은 조사 표본이 바뀐 분기를 빼고 이어 붙였습니다.</div>`; }
     else h += `<h3>임대료</h3><div class="note" style="margin-top:0">이 동네를 넓게 덮는 한국부동산원 조사 상권이 없어 임대료 변화는 판단에 넣지 않았습니다.</div>`;
     h += `<p style="margin-top:22px"><button class="back" data-goregion type="button">이 동네의 생존율·매출 자세히 보기 →</button></p>` + src(GNOTE) + '</div>';
     $('panel').innerHTML = h; return; }
@@ -472,15 +479,15 @@ function renderGent(){ paintGent(); const [p0, p1, r0, r1] = GT.yr;
   const scope = st.gu ? S.gu[st.gu] : rName(), shown = list.filter(([, g]) => st.gstage ? g.stage === st.gstage : g.stage !== 'calm' && g.stage !== 'na').sort((x, y) => SORDER.indexOf(x[1].stage) - SORDER.indexOf(y[1].stage) || (y[1].heat || 0) - (x[1].heat || 0));
   let h = `<div class="wrap"><h2>동네 변화 · ${esc(scope)}</h2><div class="sub">음식점 전체 기준 · 최근 3년(${r0}~${r1})을 그 앞 3년(${p0}~${p1})과 비교 · 임대료는 ${GT.q[GT.q.length-1]}까지</div>`;
   h += `<div class="gstages">` + ['hot', 'rent', 'push', 'cold'].map(k => `<button type="button" data-gstage="${k}" class="${st.gstage === k ? 'on' : ''}" aria-pressed="${st.gstage === k}"><i style="background:${STG[k][1]}"></i><b>${STG[k][0]}</b><span class="v">${cnt[k] || 0}곳</span><span class="sub">${STG[k][2]}</span></button>`).join('') + '</div>';
-  h += `<h3>${st.gstage ? STG[st.gstage][0] : '변화가 잡힌'} 동네 ${shown.length}곳 (행을 누르면 근거가 열립니다)</h3>` + (shown.length ? `<div class="scroll"><table><thead><tr><th>동네</th><th>단계</th><th>개업 증가</th><th>유행 업종</th>${hasSales ? '<th>유동인구</th><th>매출</th>' : ''}<th>임대료 1년</th><th>오래된 가게 폐업</th></tr></thead><tbody>`
-    + shown.map(([d, g]) => { const x = g.area != null && GT.areas[g.area].x; return `<tr data-dong="${d}"><td>${esc(S.dong[d][0])}${st.gu ? '' : ` <span class="sub">${esc(S.gu[S.dong[d][1]] || '')}</span>`}</td><td>${chip(g.stage)}</td><td>${spct(g.open)}</td><td>${ppf(g.trend)}</td>${hasSales ? `<td>${spct(g.pop)}</td><td>${spct(g.sale)}</td>` : ''}<td>${x ? spct(x.c1) : '–'}</td><td>${pct(g.old)}</td></tr>`; }).join('') + '</tbody></table></div>' : '<div class="note">해당하는 동네가 없습니다.</div>');
+  h += `<h3>${st.gstage ? STG[st.gstage][0] : '변화가 잡힌'} 동네 ${shown.length}곳 (행을 누르면 근거가 열립니다)</h3>` + (shown.length ? `<div class="scroll"><table><thead><tr><th>동네</th><th>단계</th><th>개업 증가</th><th>유행 업종</th>${gHas() ? (st.reg === 'seoul' ? '<th>유동인구</th>' : '') + '<th>매출</th>' : ''}<th>임대료 1년</th><th>오래된 가게 폐업</th></tr></thead><tbody>`
+    + shown.map(([d, g]) => { const x = g.area != null && GT.areas[g.area].x; return `<tr data-dong="${d}"><td>${esc(S.dong[d][0])}${st.gu ? '' : ` <span class="sub">${esc(S.gu[S.dong[d][1]] || '')}</span>`}</td><td>${chip(g.stage)}</td><td>${spct(g.open)}</td><td>${ppf(g.trend)}</td>${gHas() ? `${st.reg === 'seoul' ? `<td>${spct(g.pop)}</td>` : ''}<td>${spct(g.sale)}</td>` : ''}<td>${x ? spct(x.c1) : '–'}</td><td>${pct(g.old)}</td></tr>`; }).join('') + '</tbody></table></div>' : '<div class="note">해당하는 동네가 없습니다.</div>');
   const ar = GT.areas.filter(a => a.r === st.reg && a.x).sort((x, y) => y.x.x1 - x.x.x1), up = a => a.x.x1 >= GT.th.x1 || (a.x.x3 != null && a.x.x3 >= GT.th.x3);
   if (ar.length){ const b = GT.avg[ar[0].s];
-    h += `<h3>임대료가 유난히 오른 상권 (${esc(rName())} ${ar.length}개 상권 중 1년 상승률 순)</h3><div class="scroll" style="max-height:330px"><table><thead><tr><th>상권</th><th>유형</th><th>㎡당 월 임대료</th><th>1년</th><th>평균 대비</th><th>3년</th><th>평균 대비</th></tr></thead><tbody>`
-      + ar.map(a => `<tr style="cursor:default" class="${up(a) ? 'gup' : ''}"><td>${up(a) ? '<b>' + esc(a.n) + '</b> <span class="chip"><i style="background:' + STG.rent[1] + '"></i>급등</span>' : esc(a.n)}</td><td>${GTN[a.x.t]}</td><td>${rfmt(a.x.last)}</td><td>${spct(a.x.c1)}</td><td>${ppf(a.x.x1)}</td><td>${spct(a.x.c3)}</td><td>${ppf(a.x.x3)}</td></tr>`).join('')
+    h += `<h3>임대료가 유난히 오른 상권 (${esc(rName())} ${ar.length}개 상권 중 1년 상승률 순 · 행을 누르면 지도에서 확대)</h3><div class="scroll" style="max-height:330px"><table><thead><tr><th>상권</th><th>유형</th><th>㎡당 월 임대료</th><th>1년</th><th>평균 대비</th><th>3년</th><th>평균 대비</th></tr></thead><tbody>`
+      + ar.map(a => `<tr data-area="${GT.areas.indexOf(a)}" title="누르면 지도에서 이 상권으로 확대합니다" class="${up(a) ? 'gup' : ''}${st.garea === GT.areas.indexOf(a) ? ' apick' : ''}"><td>${up(a) ? '<b>' + esc(a.n) + '</b> <span class="chip"><i style="background:' + STG.rent[1] + '"></i>급등</span>' : esc(a.n)}</td><td>${GTN[a.x.t]}</td><td>${rfmt(a.x.last)}</td><td>${spct(a.x.c1)}</td><td>${ppf(a.x.x1)}</td><td>${spct(a.x.c3)}</td><td>${ppf(a.x.x3)}</td></tr>`).join('')
       + `<tr style="cursor:default"><td><b>${ar[0].s} 평균</b></td><td>소규모</td><td>${rfmt(b.small.v[b.small.v.length-1])}</td><td>${spct(b.small.c1)}</td><td></td><td>${spct(b.small.c3)}</td><td></td></tr></tbody></table></div>`; }
   h += src(GNOTE, '단계를 나누는 기준') + '</div>'; $('panel').innerHTML = h; }
-const GNOTE = `<b>뜨는 중</b>: 개업 증가율, 유행 업종(카페·디저트·양식·이국 음식 등) 비중 변화, 유동인구 3년 변화, 추정매출 1년 변화의 도시 안 순위를 평균해 상위 25% 안에 드는 동네. <b>임대료 급등</b>: 동네 면적의 15% 이상을 덮는 조사 상권의 1년 임대료 상승률이 시도 평균보다 ${GT.th.x1*100}%p 이상 높거나 3년 누적이 ${GT.th.x3*100}%p 이상 높은 동네. <b>밀려나는 중</b>: 뜨는 중이거나 임대료 급등이면서, 폐업률 변화와 ${GT.old}년 넘은 가게의 폐업률이 도시 안 상위 25%인 동네. <b>식는 중</b>: 뜨는 신호가 하위 20%이고 개업이 줄어든 동네. 수원·화성은 유동인구·매출 자료가 없어 인허가와 임대료만으로 판단했습니다. 신축 아파트 입주로 개업이 몰리거나 재개발·재건축 철거로 폐업이 몰린 동네도 같은 신호로 잡히므로, 단계는 현장을 확인할 곳을 고르는 용도로 보세요.`;
+const GNOTE = `<b>뜨는 중</b>: 개업 증가율, 유행 업종(카페·디저트·양식·이국 음식 등) 비중 변화, 유동인구 3년 변화, 추정매출 1년 변화의 도시 안 순위를 평균해 상위 25% 안에 드는 동네. <b>임대료 급등</b>: 동네 면적의 15% 이상을 덮는 조사 상권의 1년 임대료 상승률이 시도 평균보다 ${GT.th.x1*100}%p 이상 높거나 3년 누적이 ${GT.th.x3*100}%p 이상 높은 동네. <b>밀려나는 중</b>: 뜨는 중이거나 임대료 급등이면서, 폐업률 변화와 ${GT.old}년 넘은 가게의 폐업률이 도시 안 상위 25%인 동네. <b>식는 중</b>: 뜨는 신호가 하위 20%이고 개업이 줄어든 동네. 수원·화성의 매출은 경기도 카드매출 집계(경기데이터드림)를 썼고, 화성은 2025년과 2024년을 비교했습니다. 경기도 유동인구 집계는 동마다 변화 폭이 지나치게 커서 판단에 넣지 않았습니다. 신축 아파트 입주로 개업이 몰리거나 재개발·재건축 철거로 폐업이 몰린 동네도 같은 신호로 잡히므로, 단계는 현장을 확인할 곳을 고르는 용도로 보세요.`;
 
 // ===== 1. 지역 찾기
 function renderRegion(){ paintDongs();
@@ -650,8 +657,9 @@ const SRCS = {
   sales: ['추정매출', ['서울시 상권분석서비스 ‘추정매출-행정동’ (서울 열린데이터광장)', '2024~2025년 분기별 · 점포 수는 같은 서비스의 ‘점포-행정동’', '카드 결제 등을 바탕으로 한 추정치이며 신고 매출이 아닙니다', '서울만 있습니다 (수원·화성 없음)']],
   pop: ['유동인구', ['서울시 상권분석서비스 ‘길단위인구-행정동’ (서울 열린데이터광장)', '2021년 1분기 ~ 2026년 2분기 분기 합계', '사람 수를 직접 센 값이 아닌 추정치입니다', '서울만 있습니다 (수원·화성 없음)']],
   rent: ['임대료·공실률', ['한국부동산원 ‘상업용부동산 임대동향조사’ 상가 통계표와 상권 구획도 (R-ONE 공표보고서)', `${RT.q[RQ-1].replace('.', '년 ').replace('Q', '분기')} 공표 · 최근 8개 분기`, '조사 대상 상권의 표본 건물 평균이라 개별 점포의 실제 임대료와 다를 수 있습니다']],
+  gg: ['경기도 카드매출', ['경기데이터드림 ‘카드매출 행정동 집계’의 외식 업종 합계', '수원은 2026년 8월까지, 화성은 2025년 12월까지 있습니다', '동네 변화 탭의 매출 변화율 계산에만 썼습니다']],
   bc: ['(예시) 블록 단위 카드매출', ['2021년 블록 단위 카드매출 표본', '일부 카드사 결제분만 담은 표본이라 지금의 실제 매출을 나타내지 않습니다']] };
-const srcKeys = t => /단계|신호/.test(t) ? ['permit', 'pop', 'sales', 'rent'] : /카드매출/.test(t) ? ['bc'] : /동네 순위/.test(t) ? ['permit', 'sales', 'pop', 'rent'] : /자치구별/.test(t) ? ['permit', 'sales'] : /점포당 유동인구/.test(t) ? ['pop', 'permit'] : /임대료|공실/.test(t) ? ['rent'] : /유동인구/.test(t) ? ['pop'] : /매출/.test(t) ? ['sales'] : ['permit'];
+const srcKeys = t => /단계|신호/.test(t) ? (st.reg === 'seoul' ? ['permit', 'pop', 'sales', 'rent'] : ['permit', 'gg', 'rent']) : /카드매출/.test(t) ? ['bc'] : /동네 순위/.test(t) ? ['permit', 'sales', 'pop', 'rent'] : /자치구별/.test(t) ? ['permit', 'sales'] : /점포당 유동인구/.test(t) ? ['pop', 'permit'] : /임대료|공실/.test(t) ? ['rent'] : /유동인구/.test(t) ? ['pop'] : /매출/.test(t) ? ['sales'] : ['permit'];
 const srcBox = keys => `<div class="srcbox">${keys.map(k => `<b>${SRCS[k][0]}</b><ul>${SRCS[k][1].map(x => `<li>${x}</li>`).join('')}</ul>`).join('')}</div>`;
 function addSrcButtons(){ for (const el of $('panel').querySelectorAll('h3, details.fold>summary, .kpi .l')){ if (el.querySelector('.srcb')) continue;
     const k = srcKeys(el.textContent), kp = el.classList.contains('l'), b = document.createElement('button'); b.type = 'button'; b.className = 'srcb' + (kp ? ' mini' : ''); b.dataset.src = k.join(','); b.textContent = kp ? 'i' : '출처'; b.title = '어디서 가져온 자료인지 보기'; b.setAttribute('aria-label', '자료 출처 보기'); el.classList.add('hsrc'); el.appendChild(b); }
@@ -663,11 +671,12 @@ $('panel').addEventListener('click', e => { const b = e.target.closest('.srcb');
   if (on || !host) return; b.classList.add('on'); b.setAttribute('aria-expanded', 'true'); host.insertAdjacentHTML('afterend', srcBox(b.dataset.src.split(','))); }, true);
 $('panel').addEventListener('click', e => { let t;
   if ((t = e.target.closest('[data-sort]'))){ st.sort = t.dataset.sort; return render(); }
-  if ((t = e.target.closest('[data-gstage]'))){ st.gstage = st.gstage === t.dataset.gstage ? '' : t.dataset.gstage; return render(); }
+  if ((t = e.target.closest('[data-gstage]'))){ st.gstage = st.gstage === t.dataset.gstage ? '' : t.dataset.gstage; st.garea = null; render(); if (st.gstage) zoomDongs(DONGS.filter(d => gd(d).stage === st.gstage && (!st.gu || S.dong[d][1] === st.gu))); else fitRegion(); return; }
+  if ((t = e.target.closest('[data-area]'))){ const i = +t.dataset.area, y = $('panel').scrollTop; st.garea = st.garea === i ? null : i; render(); $('panel').scrollTop = y; if (st.garea != null) focusArea(i, true); return; }
   if ((t = e.target.closest('[data-gback]'))){ st.dong = null; render(); fitRegion(); return; }
   if ((t = e.target.closest('[data-goregion]'))){ st.tab = 'region'; return render(); }
   if ((t = e.target.closest('[data-spot]'))){ const d = S.dong[t.dataset.spot]; st.gu = d[1]; $('gu').value = d[1]; st.cur = -1; st.tab = 'spot'; render(); flyTo(d[2], d[3], 16); return; }
-  if ((t = e.target.closest('[data-dong]'))){ st.dong = t.dataset.dong; const d = S.dong[st.dong]; if (view) flyTo(d[2], d[3], Math.max(Math.round(view.zoom), 13)); render(); $('panel').scrollTop = 0; return; }
+  if ((t = e.target.closest('[data-dong]'))){ st.dong = t.dataset.dong; st.garea = null; const d = S.dong[st.dong]; if (view){ if (st.tab === 'gent' && dongG[st.dong]) zoomDongs([st.dong]); else flyTo(d[2], d[3], Math.max(Math.round(view.zoom), 13)); } render(); $('panel').scrollTop = 0; return; }
   if ((t = e.target.closest('[data-u]'))){ st.U = +t.dataset.u; $('upt').value = st.U; if ($('upt').value !== String(st.U)) $('upt').value = '-1'; return render(); }
   if ((t = e.target.closest('[data-gu]'))){ st.gu = t.dataset.gu; $('gu').value = st.gu; st.dong = null; st.tab = 'region'; $('gu').onchange(); return; }
   if ((t = e.target.closest('[data-f]'))){ st.floor = t.dataset.f; st.unit = '*'; return render(); }
