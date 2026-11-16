@@ -490,7 +490,7 @@ function spotSales(G, b, U, R){ if (!G.sales || !Object.keys(G.sales).length) re
   const ag = {}; let nS = 0;
   for (const s of suds){ const d = G.sales[s]; if (!d) continue; nS++; for (const k in d){ const e = d[k], a = ag[k] || (ag[k] = {mct:0, amt:0, cnt:0, g:[0,0], a:[0,0,0,0,0,0], t:[0,0,0,0,0,0], d:[0,0,0,0,0,0,0]});
     a.mct += e[0].reduce((x, y) => x+y, 0); a.amt += e[1].reduce((x, y) => x+y, 0); a.cnt += e[2]; e[3].forEach((v, i) => a.g[i] += v); e[4].forEach((v, i) => a.a[i] += v); e[5].forEach((v, i) => a.t[i] += v); e[6].forEach((v, i) => a.d[i] += v); } }
-  let h = `<details class="fold"><summary>참고: 2021년 블록 단위 카드매출 (샘플데이터)</summary><div class="note" style="margin:0 0 8px">샘플데이터입니다. BC카드 결제분, 주변 ${R}m 안 ${nS}개 구역</div>`; const ks = Object.keys(ag).sort((x, y) => ag[y].amt - ag[x].amt);
+  let h = `<details class="fold"><summary>(예시) 2021년 블록 단위 카드매출</summary><div class="note" style="margin:0 0 8px"><b style="color:var(--stamp)">예시 자료입니다.</b> 2021년 일부 카드사 결제분만 담은 표본이라 지금의 실제 매출을 나타내지 않습니다. 주변 ${R}m 안 ${nS}개 구역 기준.</div>`; const ks = Object.keys(ag).sort((x, y) => ag[y].amt - ag[x].amt);
   if (!ks.length) return h + '<div class="sub">이 주변은 매출 자료가 없습니다.</div></details>';
   const pick = st.K && ag[st.K] ? st.K : (U >= 0 && ag[U2K[S.upt[U]]] ? U2K[S.upt[U]] : +ks[0]);
   h += '<table><thead><tr><th>업종</th><th>가맹점(월평균)</th><th>연 매출</th><th>점포당 월 매출</th><th>건당</th></tr></thead><tbody>'
