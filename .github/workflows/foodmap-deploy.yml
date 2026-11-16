@@ -1,0 +1,35 @@
+# foodmap 자동 반영: 이 브랜치(codex/foodmap-deploy)에 push 되면 서버 러너가 IIS 폴더에 그대로 복사한다.
+# 러너는 kgeosolution-lgtm/guri-gmap 저장소에 등록된 kgeodata-guri(라벨 guri-preview)를 쓴다.
+name: Foodmap deployment
+on:
+  push:
+    branches: [codex/foodmap-deploy]
+permissions:
+  contents: read
+concurrency:
+  group: foodmap-deploy
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: [self-hosted, Windows, X64, guri-preview]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Install into IIS folder
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ProgressPreference = 'SilentlyContinue'
+          if ($env:COMPUTERNAME -ne 'KGO-GIS') { throw 'Unexpected server' }
+          $src = $env:GITHUB_WORKSPACE
+          $target = 'D:\codesolution\kgeodata\foodmap'
+          if (-not (Test-Path -LiteralPath (Join-Path $src 'index.html'))) { throw 'index.html missing' }
+          if (-not (Test-Path -LiteralPath (Join-Path $src 'data\summary.js'))) { throw 'data missing' }
+          New-Item -ItemType Directory -Force -Path $target | Out-Null
+          robocopy $src $target /MIR /XD .git .github /XF .gitattributes .gitignore /R:2 /W:2 /NFL /NDL /NJH /NJS /NP | Out-Null
+          if ($LASTEXITCODE -ge 8) { throw 'copy failed' }
+          $n = (Get-ChildItem -LiteralPath $target -Recurse -File | Where-Object { $_.FullName -notmatch '\\\.git\\' }).Count
+          "DEPLOYED files=$n commit=$env:GITHUB_SHA"
+          exit 0
