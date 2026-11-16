@@ -1,0 +1,565 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>서울 음식점 창업 지도</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://js.arcgis.com/4.33/esri/themes/light/main.css">
+<style>
+/* 인허가 대장에서 가져온 생각: 흰 종이, 남색 잉크, 판정은 인주색 도장 */
+:root{--bg:#f2f4f6;--card:#fff;--ink:#16202a;--sub:#5b6875;--line:#d8dee4;--accent:#1f3a8a;--weak:#e9eefa;
+--open:#1e8e5a;--closed:#a3acb5;--popup:#d9912b;--stamp:#d43d2a;--holdbg:#eef1f4}
+@media (prefers-color-scheme:dark){:root{--bg:#10151a;--card:#182028;--ink:#e6ebf0;--sub:#95a2af;--line:#2b3641;--accent:#93b2ff;--weak:#1c2942;
+--open:#4cc38d;--closed:#5e6a76;--popup:#e6a44a;--stamp:#ff7a66;--holdbg:#202a34}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 14px/1.55 "IBM Plex Sans KR","Malgun Gothic","Apple SD Gothic Neo",sans-serif;height:100vh;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* 머리 */
+header{background:var(--card);border-bottom:1px solid var(--line)}
+.top{display:flex;align-items:flex-end;gap:28px;padding:12px 20px 0;flex-wrap:wrap}
+header h1{font-size:18px;font-weight:700;letter-spacing:-.02em;margin:0 0 11px;white-space:nowrap}
+header h1 small{font-size:11.5px;font-weight:500;color:var(--sub);margin-left:6px;letter-spacing:0}
+nav{display:flex;gap:4px}
+nav button{font-weight:600;font-size:15px;border:0;background:none;color:var(--sub);padding:6px 14px 9px;cursor:pointer;border-bottom:3px solid transparent;text-align:left;line-height:1.3}
+nav button:hover{color:var(--ink)}
+nav button.on{color:var(--ink);border-bottom-color:var(--accent)}
+nav button small{display:block;font-weight:400;font-size:12px;color:var(--sub)}
+#asof{margin-left:auto;font-size:12px;color:var(--sub);text-align:right;line-height:1.4}
+@media (max-width:1180px){#asof{display:none}}
+.ctl{display:flex;gap:14px;align-items:center;flex-wrap:wrap;padding:8px 20px;background:var(--bg);border-top:1px solid var(--line)}
+.ctl label{color:var(--sub);font-size:12.5px;display:flex;align-items:center;gap:6px}
+input,select{background:var(--card);border:1px solid var(--line);border-radius:4px;padding:5px 8px;font-size:13.5px}
+.search{position:relative;flex:1;min-width:220px;max-width:400px}
+.search input{width:100%}
+#results{position:absolute;z-index:2000;left:0;right:0;top:calc(100% + 2px);background:var(--card);border:1px solid var(--ink);border-radius:4px;max-height:320px;overflow:auto;display:none}
+#results div{padding:7px 10px;cursor:pointer;border-bottom:1px solid var(--line)}
+#results div:hover{background:var(--weak)}
+#results small{color:var(--sub);display:block}
+
+/* 몸 */
+main{flex:1;display:flex;min-height:0}
+#mapwrap{flex:1;min-height:300px;position:relative;background:#e3e7ea}
+#map{position:absolute;inset:0}
+.esri-view .esri-view-surface:focus::after{outline:none!important}
+#tip{position:absolute;display:none;pointer-events:none;z-index:5;background:#16202a;color:#fff;padding:6px 9px;border-radius:4px;font-size:12.5px;white-space:nowrap}
+#panel{width:540px;max-width:100%;overflow:auto;padding:22px 24px 40px;background:var(--card);border-left:1px solid var(--line)}
+body.trend #mapwrap{display:none}
+body.trend #panel{width:100%;border-left:0}
+body.trend #panel>.wrap{max-width:1180px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0 36px}
+body.trend .full{grid-column:1/-1}
+@media (max-width:900px){body{height:auto}main{flex-direction:column}#mapwrap{height:46vh;flex:none}#panel{width:100%;border-left:0;padding:18px 16px 32px}body.trend #panel>.wrap{grid-template-columns:1fr}.top{gap:10px;padding:10px 16px 0}.ctl{padding:8px 16px}}
+
+/* 글 */
+h2{font-size:22px;font-weight:700;letter-spacing:-.02em;line-height:1.3;margin:0 0 4px}
+h2 .sub{font-size:14px;font-weight:500;letter-spacing:0}
+h3,details.fold>summary{font-size:15px;font-weight:600;line-height:1.4;margin:30px 0 10px;padding-top:14px;border-top:1px solid var(--line)}
+.sub{color:var(--sub);font-size:12.5px}
+.note{font-size:12.5px;color:var(--sub);margin-top:8px;max-width:68ch}
+.empty{padding:8px 0;max-width:42ch}
+.empty h2{margin-bottom:10px}
+.empty p{color:var(--sub);margin:0 0 10px}
+
+/* 층·호 고르기 */
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0 0}
+.chips button,.btn{font-size:12.5px;padding:4px 11px;border-radius:4px;border:1px solid var(--line);background:var(--card);cursor:pointer}
+.chips button:hover{border-color:var(--ink)}
+.chips button.on{background:var(--ink);border-color:var(--ink);color:var(--card);font-weight:600}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600;font-size:13.5px;padding:8px 14px}
+@media (prefers-color-scheme:dark){.btn.pri{color:#10151a}}
+
+/* 판정: 도장 */
+.verdict{display:flex;gap:16px;align-items:center;margin:18px 0 16px}
+.verdict .stamp{flex:none;font-size:17px;font-weight:700;letter-spacing:.14em;padding:7px 9px 7px 12px;border:3px solid currentColor;border-radius:5px;transform:rotate(-5deg);line-height:1.2}
+.verdict.warn .stamp{color:var(--stamp)}.verdict.ok .stamp{color:var(--open)}.verdict.hold .stamp{color:var(--sub)}
+.verdict b{display:block;font-size:16px;font-weight:600;line-height:1.4;margin-bottom:2px}
+.verdict p{margin:0;color:var(--sub);font-size:13px}
+
+/* 숫자 줄: 상자 없이 대장처럼 */
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);border-top:2px solid var(--ink);border-bottom:1px solid var(--line);margin-top:12px}
+.kpis.k5{grid-template-columns:repeat(5,1fr)}
+.kpi{padding:10px 12px 11px;border-left:1px solid var(--line)}
+.kpi:first-child{border-left:0;padding-left:0}
+.kpi .l{font-size:12px;color:var(--sub)}
+.kpi .v{font-size:24px;font-weight:600;letter-spacing:-.02em;line-height:1.25;font-variant-numeric:tabular-nums}
+.kpi .n{font-size:12px;color:var(--sub);line-height:1.4}
+@media (max-width:900px){.kpis.k5{grid-template-columns:repeat(2,1fr)}.kpis.k5 .kpi:nth-child(odd){border-left:0;padding-left:0}.kpis.k5 .kpi{border-top:1px solid var(--line)}}
+
+/* 표 */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+th:first-child,td:first-child{text-align:left;padding-left:0}
+th{color:var(--sub);font-weight:500;font-size:12px;position:sticky;top:0;background:var(--card);border-bottom:1.5px solid var(--ink)}
+th.s{color:var(--accent);font-weight:700}
+tbody tr{cursor:pointer}
+tbody tr:hover td{background:var(--weak)}
+tr.pick td{background:var(--weak);font-weight:600}
+tr.pick td:first-child{box-shadow:inset 3px 0 var(--accent);padding-left:8px}
+.scroll{max-height:440px;overflow:auto}
+
+/* 그림 */
+svg text{fill:var(--ink);font-size:11px;font-family:inherit}
+svg .mut{fill:var(--sub)}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--sub);margin:6px 0;flex-wrap:wrap}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.bars{display:grid;grid-template-columns:auto 1fr auto;gap:4px 8px;font-size:12.5px;align-items:center;font-variant-numeric:tabular-nums}
+.bars .bar{height:8px;background:var(--accent);border-radius:1px;min-width:1px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+
+/* 반응: 고른 것이 바뀔 때만 살짝 올라오고, 지도와 목록이 서로 강조된다 */
+@keyframes rise{from{opacity:0;transform:translateY(6px)}}
+#panel.fresh>.wrap,#panel.fresh>.empty{animation:rise .22s ease-out}
+@media (prefers-reduced-motion:reduce){#panel.fresh>.wrap,#panel.fresh>.empty{animation:none}}
+tr.hov td{background:var(--weak)}
+#results div.act{background:var(--weak);box-shadow:inset 3px 0 var(--accent)}
+#busy{position:absolute;bottom:26px;left:50%;transform:translateX(-50%);z-index:4;display:none;background:#16202a;color:#fff;font-size:12px;padding:4px 10px;border-radius:99px}
+#hint{position:absolute;top:12px;right:12px;z-index:4;background:#fff;color:#16202a;border:1px solid #16202a;border-radius:4px;font-size:12px;padding:5px 9px;max-width:230px}
+@media (max-width:900px){nav button small{display:none}nav button{padding:6px 10px 8px}.ctl{gap:8px}.ctl label{flex:1 1 44%}.ctl select{flex:1;min-width:0}.search{flex:1 1 100%;max-width:none;order:-1}.grid2{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(2,1fr)}.kpis .kpi:nth-child(odd){border-left:0;padding-left:0}.kpis .kpi:nth-child(n+3){border-top:1px solid var(--line)}.kpi .v{font-size:21px}#hint{display:none}}
+
+/* 접어 둔 설명 */
+details.src{margin-top:10px;font-size:12.5px;color:var(--sub)}
+details.src>summary{cursor:pointer;display:inline-block;text-decoration:underline dotted;text-underline-offset:3px}
+details.src>summary::-webkit-details-marker{display:none}
+details.src p{margin:6px 0 0;max-width:68ch}
+details.fold>summary{cursor:pointer;list-style:none}
+details.fold>summary::-webkit-details-marker{display:none}
+details.fold>summary::after{content:" 펼치기";font-size:12.5px;font-weight:400;color:var(--accent);margin-left:6px}
+details.fold[open]>summary::after{content:" 접기"}
+
+.maplegend{position:absolute;left:12px;bottom:26px;z-index:4;background:#fff;color:#16202a;padding:8px 10px;border:1px solid #16202a;border-radius:4px;font-size:12px;line-height:1.65}
+.maplegend b{font-weight:600}
+.maplegend i{display:inline-block;width:10px;height:10px;margin-right:6px}
+</style>
+</head>
+<body>
+<header>
+  <div class="top">
+    <h1>서울 음식점 창업 지도<small>시제품</small></h1>
+    <nav id="nav">
+      <button data-t="region">지역 찾기<small>어느 동네가 좋을까</small></button>
+      <button data-t="spot">자리 진단<small>이 자리는 괜찮을까</small></button>
+      <button data-t="trend">업계 동향<small>이 종목은 요즘 어떤가</small></button>
+    </nav>
+  </div>
+  <div class="ctl">
+    <label>창업 종목 <select id="upt"></select></label>
+    <label class="c-region">지도 색칠 <select id="metric"><option value="surv">3년 생존율</option><option value="now">영업 중 점포 수</option><option value="net">최근 3년 순증감</option><option value="sale">점포당 월매출(2025)</option><option value="yoy">매출 증감(전년 대비)</option><option value="rent">소규모 상가 임대료</option><option value="pop">유동인구</option><option value="ppl">점포당 유동인구</option></select></label>
+    <label class="c-region c-spot">자치구 <select id="gu"></select></label>
+    <div class="search c-region c-spot"><input id="q" placeholder="주소로 바로 찾기 (예: 독막로3길 24-9)" autocomplete="off" aria-label="주소 또는 상호 검색"><div id="results"></div></div>
+    <label class="c-spot">주변 반경 <select id="rad"><option>200</option><option selected>300</option><option>500</option></select>m</label>
+    <div id="asof"></div>
+  </div>
+</header>
+<main>
+  <div id="mapwrap"><div id="map"></div><div id="legend" class="maplegend"></div><div id="tip"></div><div id="busy">지도를 불러오는 중</div><div id="hint"></div></div>
+  <div id="panel"></div>
+</main>
+<script src="https://js.arcgis.com/4.33/"></script>
+<script src="data/summary.js"></script>
+<script src="data/dong.js"></script>
+<script src="data/sales.js"></script>
+<script src="data/pop.js"></script>
+<script src="data/rent.js"></script>
+<script>
+const S = window.SUM, NY = S.y1 - S.y0 + 1, $ = id => document.getElementById(id);
+const KSIC = {56111:'한식 일반',56112:'한식 면요리',56113:'한식 육류요리',56114:'한식 해산물요리',56121:'중식',56122:'일식',56123:'서양식',56129:'기타 외국식',56130:'구내식당',56141:'출장 음식',56142:'이동 음식',56191:'제과점',56192:'피자·햄버거·샌드위치',56193:'치킨',56194:'김밥·간이음식',56199:'간이음식 포장판매',56211:'일반 유흥주점',56212:'무도 유흥주점',56213:'생맥주 전문점',56219:'기타 주점',56221:'커피 전문점',56229:'기타 비알코올 음료점'};
+const U2K = {'한식':56111,'분식':56194,'커피숍':56221,'다방':56221,'호프/통닭':56219,'통닭(치킨)':56193,'일식':56122,'중국식':56121,'경양식':56123,'패스트푸드':56192,'정종/대포집/소주방':56219,'횟집':56114,'식육(숯불구이)':56113,'외국음식전문점(인도,태국등)':56129,'제과점영업':56191,'아이스크림':56229,'전통찻집':56229,'까페':56221,'라이브카페':56219};
+const dstr = n => `${Math.floor(n/10000)}-${String(Math.floor(n/100)%100).padStart(2,'0')}-${String(n%100).padStart(2,'0')}`;
+const day = n => Date.UTC(Math.floor(n/10000), Math.floor(n/100)%100-1, n%100)/864e5;
+const CUT = day(S.cut), FROM = 20100101, SURV_TO = S.cut - 30000, POPUP = 90;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const pct = x => x == null ? '–' : Math.round(x*100) + '%';
+const num = v => v == null ? '–' : Math.round(v).toLocaleString();
+const sgn = v => (v > 0 ? '+' : '') + v.toLocaleString();
+const won = v => v == null || v === 0 ? '–' : v >= 1e12 ? (v/1e12).toFixed(v >= 1e13 ? 1 : 2) + '조' : v >= 1e8 ? (v/1e8).toFixed(v >= 1e10 ? 0 : 1) + '억' : Math.round(v/1e4).toLocaleString() + '만';
+const yrs = m => m == null ? '–' : (m/12).toFixed(1) + '년';
+const st = {tab:'region', U:-1, metric:'surv', gu:'', dong:null, cur:-1, floor:'*', unit:'*', K:null, sort:null};
+const uName = () => st.U < 0 ? '음식점 전체' : S.upt[st.U];
+
+// ---------- 요약 집계 (행정동 x 업태)
+const DONGS = Object.keys(S.dong).filter(d => S.st[d]);
+function agg(dongs, U){ const t = {now:0, k:0, n:0, op:new Array(NY).fill(0), cl:new Array(NY).fill(0)};
+  for (const d of dongs){ const m = S.st[d]; if (!m) continue;
+    for (const u of (U < 0 ? Object.keys(m) : [U])){ const e = m[u]; if (!e) continue; t.now += e[0]; t.k += e[1]; t.n += e[2]; for (let i = 0; i < NY; i++){ t.op[i] += e[3][i]; t.cl[i] += e[4][i]; } } }
+  t.rate = t.n ? t.k/t.n : null; t.net = 0; for (let i = NY-3; i < NY; i++) t.net += t.op[i] - t.cl[i]; return t; }
+const SL = window.SALES, NQ = SL.q.length, HQ = NQ/2, CAT = SL.cat, CATS = Object.keys(CAT);
+const U2C = {'한식':'CS100001','냉면집':'CS100001','식육(숯불구이)':'CS100001','탕류(보신용)':'CS100001','중국식':'CS100002','일식':'CS100003','횟집':'CS100003','복어취급':'CS100003','경양식':'CS100004','패밀리레스트랑':'CS100004','제과점영업':'CS100005','과자점':'CS100005','패스트푸드':'CS100006','통닭(치킨)':'CS100007','분식':'CS100008','김밥(도시락)':'CS100008','호프/통닭':'CS100009','정종/대포집/소주방':'CS100009','간이주점':'CS100009','커피숍':'CS100010','다방':'CS100010','까페':'CS100010','전통찻집':'CS100010'};
+const catOf = U => U < 0 ? null : U2C[S.upt[U]];
+const catName = U => U < 0 ? '외식 10개 업종 합계' : CAT[catOf(U)];
+function saleAggC(dongs, c){ const t = {amt:new Array(NQ).fill(0), st:new Array(NQ).fill(0), g:[0,0], a:[0,0,0,0,0,0], t:[0,0,0,0,0,0], d:[0,0,0,0,0,0,0]}; let sst = 0, p0 = 0, p1 = 0;
+  for (const d of dongs){ const m = SL.d[d]; if (!m) continue;
+    for (const k of (c ? [c] : CATS)){ const e = m[k]; if (!e) continue;
+      for (let i = 0; i < NQ; i++){ t.amt[i] += e[0][i]; t.st[i] += e[1][i]; if (i >= HQ && e[0][i] > 0) sst += e[1][i]; if (i >= HQ && e[0][i] > 0 && e[0][i-HQ] > 0){ p1 += e[0][i]; p0 += e[0][i-HQ]; } }
+      e[2].forEach((v, i) => t.g[i] += v); e[3].forEach((v, i) => t.a[i] += v); e[4].forEach((v, i) => t.t[i] += v); e[5].forEach((v, i) => t.d[i] += v); } }
+  t.y0 = 0; t.y1 = 0; for (let i = 0; i < NQ; i++) if (i < HQ) t.y0 += t.amt[i]; else t.y1 += t.amt[i];
+  t.stores = t.st[NQ-1]; t.per = sst >= 12 ? t.y1/(sst*3) : null; t.yoy = t.per != null && p0 > 0 ? p1/p0 - 1 : null; t.chg = p0 > 0 ? p1/p0 - 1 : null; return t; }
+function saleAgg(dongs, U){ const c = catOf(U); return U >= 0 && !c ? null : saleAggC(dongs, c); }
+const spct = v => v == null ? '–' : (v > 0 ? '+' : '') + (v*100).toFixed(Math.abs(v) < .1 ? 1 : 0) + '%';
+// ---------- 임대료·공실률 (한국부동산원 상업용부동산 임대동향조사, 상권 단위)
+const RT = window.RENT, RQ = RT.q.length, RTYPE = [['small', '소규모 상가'], ['mid', '중대형 상가'], ['strata', '집합 상가']];
+const rfmt = v => v == null ? '–' : (v*1000).toLocaleString(undefined, {maximumFractionDigits:0}) + '원';
+const rlast = (o, t, k) => o[t] && o[t][k] ? o[t][k][RQ-1] : null;
+const rchg = (o, t, k) => { const e = o[t] && o[t][k]; return e && e[RQ-1] != null && e[RQ-5] ? (k ? e[RQ-1] - e[RQ-5] : e[RQ-1]/e[RQ-5] - 1) : null; };
+function dongRent(d){ const l = RT.dong[d]; if (!l || l[0][1] < .15) return null; return rlast(RT.areas[l[0][0]], 'small', 0); }
+RT.areas.forEach(a => { let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; a.rings = []; a.g.forEach(pg => pg.forEach(r => { a.rings.push(r); for (const c of r){ if (c[0] < x0) x0 = c[0]; if (c[0] > x1) x1 = c[0]; if (c[1] < y0) y0 = c[1]; if (c[1] > y1) y1 = c[1]; } })); a.bb = [x0, y0, x1, y1]; });
+function areaAt(lon, lat){ for (let k = 0; k < RT.areas.length; k++){ const a = RT.areas[k], b = a.bb; if (lon < b[0] || lon > b[2] || lat < b[1] || lat > b[3]) continue; let ins = false;
+    for (const r of a.rings) for (let i = 0, j = r.length-1; i < r.length; j = i++){ const xi = r[i][0], yi = r[i][1], xj = r[j][0], yj = r[j][1]; if ((yi > lat) !== (yj > lat) && lon < (xj-xi)*(lat-yi)/(yj-yi) + xi) ins = !ins; }
+    if (ins) return k; } return -1; }
+const PP = window.POP, PQ = PP.q.length, qlab = q => `${q.slice(0, 4)}년 ${q[4]}분기`;
+function popOf(d){ const e = PP.d[d]; if (!e) return null; const last = e[0][PQ-1], prev = e[0][PQ-5]; return {q:e[0], last, yoy: prev ? last/prev - 1 : null, g:e[1], a:e[2], t:e[3], d:e[4]}; }
+const popRank = {}; Object.keys(PP.d).sort((x, y) => PP.d[y][0][PQ-1] - PP.d[x][0][PQ-1]).forEach((d, i) => { popRank[d] = i + 1; });
+const MINN = 20;
+function metricOf(a, s, m, d){ if (m === 'rent') return dongRent(d); if (m === 'pop' || m === 'ppl'){ const p = popOf(d); return !p ? null : m === 'pop' ? p.last : (a.now >= 5 ? p.last/a.now : null); } return m === 'now' ? a.now : m === 'surv' ? (a.n >= MINN ? a.rate : null) : m === 'net' ? a.net : m === 'yoy' ? (s ? s.yoy : null) : (s ? s.per : null); }
+const MLAB = {surv:'3년 생존율', now:'영업 중 점포 수', net:'최근 3년 순증감', sale:'점포당 월매출(2025)', yoy:'매출 증감(전년 대비)', pop:'분기 유동인구', ppl:'점포당 유동인구', rent:'소규모 상가 임대료(㎡당 월)'};
+const mfmt = (m, v) => v == null ? '–' : m === 'surv' ? pct(v) : m === 'sale' ? won(v) : m === 'net' ? sgn(v) : m === 'yoy' ? spct(v) : m === 'pop' || m === 'ppl' ? won(v) + '명' : m === 'rent' ? rfmt(v) : num(v);
+
+// ---------- 지도 (포털 기본지도 "00. 바로e맵 Std")
+const BASEMAP = {id:'a177f5017b52486b930463f900da4d71', title:'00. 바로e맵 Std', baseMapLayers:[
+  {id:'World_Hillshade_3805', opacity:.5, title:'음영기복', url:'https://services.arcgisonline.com/arcgis/rest/services/Elevation/World_Hillshade/MapServer', visibility:true, layerType:'ArcGISTiledMapServiceLayer', maxScale:0, blendMode:'normal'},
+  {id:'VectorTile_2333', opacity:1, title:'지형도', visibility:true, layerType:'VectorTileLayer', minScale:0, maxScale:3000000, styleUrl:'https://cdn.arcgis.com/sharing/rest/content/items/d9b6f47909c74f1fb5c7cefd14470e68/resources/styles/root.json'},
+  {id:'19eeef0c455-layer-3', title:'바로e맵 Std', itemId:'732f825e769649b49f71efe5aa9fe531', layerType:'VectorTileLayer', blendMode:'multiply', styleUrl:'https://kgeodata.com/server/rest/services/Hosted/NGII_SD_20250604/VectorTileServer/resources/styles/root.json'}]};
+const SEQ = ['#e6ecf8','#b5c7ee','#7d9de0','#4169c4','#1f3a8a'], DIV = ['#c5412f','#eaa99d','#eceef0','#9db6e8','#1f3a8a'], NA = '#d5dade';
+const rgba = (h, a) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16), a];
+const setLegend = h => { $('legend').innerHTML = h; };
+let view, Graphic, Circle, dongLayer, spotLayer, selLayer, rentLayer, dongVal = {}, breaks = [];
+const flyTo = (lat, lon, zoom) => { if (view) view.goTo({center:[lon, lat], zoom}, {duration:550, easing:'ease-in-out'}).catch(() => {}); };
+function initMap(){
+  if (typeof require === 'undefined') return setLegend('지도를 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.');
+  require(['esri/Map','esri/views/MapView','esri/Basemap','esri/Graphic','esri/layers/GraphicsLayer','esri/geometry/Circle','esri/layers/FeatureLayer'], (Map, MapView, Basemap, G, GraphicsLayer, C, FeatureLayer) => {
+    Graphic = G; Circle = C;
+    dongLayer = new GraphicsLayer({visible:false}); spotLayer = new GraphicsLayer({visible:false}); selLayer = new GraphicsLayer(); rentLayer = new GraphicsLayer({visible:false});
+    RT.areas.forEach(a => rentLayer.add(new Graphic({geometry:{type:'polygon', rings:a.rings, spatialReference:{wkid:4326}}, symbol:{type:'simple-fill', color:[0,0,0,0], outline:{color:[60,40,110,.85], width:1.4, style:'dash'}}})));
+    window.DONG_GEO.features.forEach(f => { const rings = []; f.geometry.coordinates.forEach(p => p.forEach(r => rings.push(r)));
+      dongLayer.add(new Graphic({geometry:{type:'polygon', rings, spatialReference:{wkid:4326}}, attributes:{c:f.properties.c}})); });
+    // 이름표: 멀리서는 자치구, 확대하면 행정동 (겹치면 알아서 솎아 낸다)
+    const labLayer = (pts, size, weight, minScale, maxScale) => new FeatureLayer({
+      source: pts.map((q, i) => new Graphic({geometry:{type:'point', longitude:q[1], latitude:q[0]}, attributes:{oid:i, nm:q[2]}})),
+      objectIdField:'oid', fields:[{name:'oid', type:'oid'}, {name:'nm', type:'string'}], geometryType:'point', spatialReference:{wkid:4326},
+      renderer:{type:'simple', symbol:{type:'simple-marker', size:1, color:[0,0,0,0], outline:{color:[0,0,0,0], width:0}}},
+      labelingInfo:[{labelExpressionInfo:{expression:'$feature.nm'}, labelPlacement:'center-center', symbol:{type:'text', color:[22,32,42,1], haloColor:[255,255,255,.95], haloSize:1.8, font:{family:'Arial Unicode MS', size, weight}}}],
+      minScale, maxScale, popupEnabled:false, legendEnabled:false});
+    const gc = {}; for (const d of Object.keys(S.dong)){ const x = S.dong[d], e = gc[x[1]] || (gc[x[1]] = [0, 0, 0]); e[0] += x[2]; e[1] += x[3]; e[2]++; }
+    const guLab = labLayer(Object.keys(gc).filter(g => S.gu[g]).map(g => [gc[g][0]/gc[g][2], gc[g][1]/gc[g][2], S.gu[g]]), 12, 'bold', 0, 100000);
+    const dongLab = labLayer(Object.keys(S.dong).map(d => [S.dong[d][2], S.dong[d][3], S.dong[d][0]]), 9.5, 'normal', 100000, 0);
+    view = new MapView({container:'map', map:new Map({basemap:Basemap.fromJSON(BASEMAP), layers:[dongLayer, rentLayer, guLab, dongLab, spotLayer, selLayer]}), center:[126.99, 37.55], zoom:11, popupEnabled:false, constraints:{snapToZoom:true}});
+    dongLayer.graphics.forEach(g => { dongG[g.attributes.c] = g; });
+    view.on('click', e => { const tab = st.tab, layer = tab === 'region' ? dongLayer : spotLayer;
+      view.hitTest(e, {include:[layer]}).then(r => { const g = r.results.length && r.results[0].graphic; if (st.tab !== tab) return;
+        if (tab === 'region'){ if (g){ st.dong = g.attributes.c; render(); view.goTo(g.geometry.extent.clone().expand(3.2), {duration:550, easing:'ease-in-out'}).catch(() => {}); } return; }
+        if (g) return pickSpot(g.attributes.g, g.attributes.i);
+        const gu = e.mapPoint && guAt(e.mapPoint.longitude, e.mapPoint.latitude); if (gu && gu !== st.gu){ st.gu = gu; $('gu').value = gu; st.cur = -1; render(); } }); });
+    let busy = false;
+    view.on('pointer-move', e => { if (st.tab === 'trend' || busy) return; busy = true; const tab = st.tab;
+      view.hitTest(e, {include:[tab === 'region' ? dongLayer : spotLayer]}).then(r => { busy = false; const g = r.results.length && r.results[0].graphic, t = $('tip');
+        view.container.style.cursor = g ? 'pointer' : '';
+        if (tab === 'region') hoverDong(g ? g.attributes.c : null, true);
+        if (!g){ t.style.display = 'none'; return; }
+        if (tab === 'region'){ const c = g.attributes.c, d = S.dong[c]; t.innerHTML = `<b>${esc(d[0])}</b> (${esc(S.gu[d[1]] || '')})<br>${MLAB[st.metric]}: ${mfmt(st.metric, dongVal[c])}`; }
+        else { const b = GU[g.attributes.g] && GU[g.attributes.g].b[g.attributes.i]; if (!b){ t.style.display = 'none'; return; }
+          const now = b[4].filter(x => !x[4]).length; t.innerHTML = `<b>${esc(b[0])}</b><br>음식점 인허가 ${b[4].length}건, 영업 중 ${now}곳`; }
+        const w = $('mapwrap').clientWidth; t.style.display = 'block'; t.style.left = Math.min(e.x + 14, w - t.offsetWidth - 6) + 'px'; t.style.top = (e.y + 16) + 'px'; }, () => { busy = false; }); });
+    view.on('pointer-leave', () => { $('tip').style.display = 'none'; hoverDong(null, true); view.container.style.cursor = ''; });
+    view.watch('updating', u => { $('busy').style.display = u ? 'block' : 'none'; });
+    view.when(null, () => setLegend('포털 기본지도를 불러오지 못했습니다.'));
+    render(); }); }
+const dongG = {}; let hovDong = null, curRamp = SEQ;
+function dongSym(c, hov){ const v = dongVal[c], dim = st.gu && S.dong[c] && S.dong[c][1] !== st.gu, sel = c === st.dong;
+  return {type:'simple-fill', color:rgba(v == null ? NA : curRamp[cls(v)], dim ? (hov ? .3 : .1) : (hov ? .86 : .62)), outline:{color: sel ? [212,61,42,1] : hov ? [22,32,42,1] : [255,255,255,.9], width: sel ? 2.8 : hov ? 2 : .6}}; }
+// 지도에서 올리면 표의 줄이, 표에서 올리면 지도의 동이 함께 강조된다
+function hoverDong(c, fromMap){ if (c === hovDong) return; const prev = hovDong; hovDong = c;
+  if (prev && dongG[prev]) dongG[prev].symbol = dongSym(prev, false);
+  if (c && dongG[c]){ dongG[c].symbol = dongSym(c, true); if (c !== st.dong) dongLayer.graphics.reorder(dongG[c], dongLayer.graphics.length - (st.dong ? 2 : 1)); }
+  if (fromMap){ const o = document.querySelector('tr.hov'); if (o) o.classList.remove('hov'); const n = c && document.querySelector(`tr[data-dong="${c}"]`); if (n) n.classList.add('hov'); } }
+function quantiles(v, ps){ const a = v.slice().sort((x,y) => x-y); return ps.map(p => a[Math.min(a.length-1, Math.floor(p*a.length))]); }
+function cls(v){ let i = 0; while (i < breaks.length && v >= breaks[i]) i++; return i; }
+function paintDongs(){ const m = st.metric, vals = []; dongVal = {};
+  for (const d of DONGS){ const v = metricOf(agg([d], st.U), m === 'sale' || m === 'yoy' ? saleAgg([d], st.U) : null, m, d); dongVal[d] = v; if (v != null) vals.push(v); }
+  if (m === 'net'){ const ab = vals.map(Math.abs).filter(x => x > 0), q = ab.length ? quantiles(ab, [.33,.75]) : [1,2]; const t1 = Math.max(1, q[0]), t2 = Math.max(t1+1, q[1]); breaks = [-t2+1, -t1+1, t1, t2]; }
+  else if (m === 'yoy') breaks = [-.1, -.03, .03, .1];
+  else breaks = vals.length ? [...new Set(quantiles(vals, [.2,.4,.6,.8]))] : [];
+  const isDiv = m === 'net' || m === 'yoy', ramp = isDiv ? DIV : SEQ; curRamp = ramp; hovDong = null;
+  if (dongLayer){ let top = null; dongLayer.graphics.forEach(g => { const c = g.attributes.c, v = dongVal[c], dim = st.gu && S.dong[c] && S.dong[c][1] !== st.gu, sel = c === st.dong; if (sel) top = g;
+      g.symbol = dongSym(c, false); });
+    if (top) dongLayer.graphics.reorder(top, dongLayer.graphics.length - 1); }
+  const lab = []; for (let i = 0; i <= breaks.length; i++) lab.push(i === 0 ? `${mfmt(m, breaks[0])} 미만` : i === breaks.length ? `${mfmt(m, breaks[i-1])} 이상` : `${mfmt(m, breaks[i-1])} ~ ${mfmt(m, breaks[i])}`);
+  const rr = isDiv ? DIV : (breaks.length < 4 ? SEQ.slice(0, breaks.length+1) : SEQ);
+  setLegend(`<b>${esc(uName())} · ${MLAB[m]}</b><br>` + lab.map((t, i) => `<i style="background:${rr[i]}"></i>${t}`).join('<br>') + `<br><i style="background:${NA}"></i>자료 부족`); }
+
+// ---------- 조작부
+const uptTot = S.upt.map((_, i) => agg(DONGS, i));
+$('upt').innerHTML = '<option value="-1">음식점 전체</option>' + S.upt.map((u, i) => [u, i, uptTot[i].now]).filter(x => x[2] >= 200).sort((a, b) => b[2]-a[2]).map(x => `<option value="${x[1]}">${esc(x[0])}</option>`).join('');
+const GUS = Object.keys(S.gu).sort((a, b) => S.gu[a].localeCompare(S.gu[b], 'ko'));
+$('gu').innerHTML = '<option value="">서울 전체</option>' + GUS.map(c => `<option value="${c}">${esc(S.gu[c])}</option>`).join('');
+$('upt').onchange = () => { st.U = +$('upt').value; st.K = null; render(); };
+$('metric').onchange = () => { st.metric = $('metric').value; st.sort = null; render(); };
+$('rad').onchange = () => render();
+$('gu').onchange = () => { st.gu = $('gu').value; st.cur = -1; st.dong = null;
+  if (st.gu && view) view.goTo(dongLayer.graphics.filter(g => S.dong[g.attributes.c][1] === st.gu).toArray(), {animate:false}).catch(() => {}); else flyTo(37.55, 126.99, 11);
+  render(); };
+$('nav').onclick = e => { const b = e.target.closest('[data-t]'); if (b) go(b.dataset.t); };
+function go(t){ st.tab = t; render(); }
+
+// ---------- 구별 상세 자료 (필요할 때 불러옴)
+window.GU = window.GU || {}; const loading = {};
+function needGu(code, cb){ if (GU[code]) return cb(); if (loading[code]) return void loading[code].push(cb); loading[code] = [cb];
+  const s = document.createElement('script'); s.src = `data/gu_${code}.js`; s.onload = () => { prep(code); const q = loading[code]; loading[code] = null; q.forEach(f => f()); }; s.onerror = () => { loading[code] = null; if (code === st.gu) $('panel').innerHTML = '<div class="empty">자료를 불러오지 못했습니다.</div>'; }; document.head.appendChild(s); }
+function prep(code){ const g = GU[code]; g.idx = g.b.map(b => (b[0] + ' ' + b[4].map(r => r[0]).join(' ')).toLowerCase()); g.all = []; g.b.forEach(b => { for (const r of b[4]) g.all.push(r); }); }
+
+// ---------- 그림 조각
+function yearly(op, cl, w){ const W = w || 448, H = 110, bw = (W-10)/NY; let mx = 1; for (let i = 0; i < NY; i++) mx = Math.max(mx, op[i], cl[i]);
+  let s = `<svg viewBox="0 0 ${W} ${H+18}" width="100%" role="img" aria-label="연도별 개업·폐업 수" style="margin-top:6px">`;
+  for (let i = 0; i < NY; i++){ const x = 5 + i*bw, ho = op[i]/mx*(H-16), hc = cl[i]/mx*(H-16), y = S.y0+i, show = bw > 40;
+    s += `<rect x="${x+2}" y="${H-ho}" width="${bw/2-3}" height="${ho}" rx="2" fill="var(--open)"><title>${y}년 개업 ${op[i].toLocaleString()}</title></rect><rect x="${x+bw/2+1}" y="${H-hc}" width="${bw/2-3}" height="${hc}" rx="2" fill="var(--closed)"><title>${y}년 폐업 ${cl[i].toLocaleString()}</title></rect>`
+       + (show ? `<text x="${x+bw/4}" y="${H-ho-3}" text-anchor="middle" style="font-size:10px">${op[i]}</text><text class="mut" x="${x+bw*3/4}" y="${H-hc-3}" text-anchor="middle" style="font-size:10px">${cl[i]}</text>` : '')
+       + `<text class="mut" x="${x+bw/2}" y="${H+13}" text-anchor="middle">${bw > 34 ? y : "'" + String(y).slice(2)}</text>`; }
+  return s + '</svg><div class="legend"><span><i style="background:var(--open)"></i>개업</span><span><i style="background:var(--closed)"></i>폐업</span><span>막대에 마우스를 올리면 건수가 나옵니다</span></div>'; }
+function cohort(c, base){ const W = 520, H = 150, n = c.length, x = i => 34 + i*(W-50)/(n-1), y = v => 12 + (1-v)*(H-34);
+  const line = (a, col, wd) => { let d = '', pen = false; a.forEach((e, i) => { if (e[1] < MINN){ pen = false; return; } d += (pen ? 'L' : 'M') + x(i) + ' ' + y(e[0]/e[1]); pen = true; }); return `<path d="${d}" fill="none" stroke="${col}" stroke-width="${wd}"/>`; };
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="개업 연도별 3년 생존율">`;
+  for (const v of [0, .25, .5, .75, 1]) s += `<line x1="34" x2="${W-16}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text class="mut" x="30" y="${y(v)+4}" text-anchor="end">${v*100}%</text>`;
+  if (base) s += line(base, 'var(--closed)', 1.5);
+  s += line(c, 'var(--accent)', 2.5);
+  c.forEach((e, i) => { if (e[1] >= MINN) s += `<circle cx="${x(i)}" cy="${y(e[0]/e[1])}" r="3.5" fill="var(--accent)"><title>${S.y0+i}년 개업 ${e[1].toLocaleString()}곳 중 ${e[0].toLocaleString()}곳 생존 (${pct(e[0]/e[1])})</title></circle>` + (i % 2 === 1 || i === n-1 ? `<text x="${x(i)}" y="${y(e[0]/e[1])-7}" text-anchor="middle" style="font-size:10px">${pct(e[0]/e[1])}</text>` : '');
+    s += `<text class="mut" x="${x(i)}" y="${H-4}" text-anchor="middle">${S.y0+i}</text>`; });
+  return s + '</svg>' + (base ? `<div class="legend"><span><i style="background:var(--accent)"></i>${esc(uName())}</span><span><i style="background:var(--closed)"></i>음식점 전체</span></div>` : ''); }
+const bars = (labels, vals) => { const t = vals.reduce((x, y) => x+y, 0) || 1, m = Math.max(...vals) || 1; return '<div class="bars">' + labels.map((l, i) => `<span>${l}</span><span><div class="bar" style="width:${vals[i]/m*100}%"></div></span><span>${Math.round(vals[i]/t*100)}%</span>`).join('') + '</div>'; };
+const AGES = ['10대','20대','30대','40대','50대','60대+'], TIMES = ['00~06시','06~11시','11~14시','14~17시','17~21시','21~24시'], DAYS = ['월','화','수','목','금','토','일'];
+function qbars(amt, w){ const W = w || 448, H = 96, bw = (W-10)/NQ, mx = Math.max(...amt) || 1; let s = `<svg viewBox="0 0 ${W} ${H+18}" width="100%" role="img" aria-label="분기별 추정매출">`;
+  amt.forEach((v, i) => { const x = 5 + i*bw, h = v/mx*(H-16), q = SL.q[i]; s += `<rect x="${x+4}" y="${H-h}" width="${bw-8}" height="${h}" rx="2" fill="${i < HQ ? 'var(--closed)' : 'var(--accent)'}"><title>${q.slice(0,4)}년 ${q[4]}분기 ${won(v)}원</title></rect><text x="${x+bw/2}" y="${H-h-3}" text-anchor="middle" style="font-size:10px">${v ? won(v) : '–'}</text><text class="mut" x="${x+bw/2}" y="${H+13}" text-anchor="middle">'${q.slice(2,4)}.${q[4]}Q</text>`; });
+  return s + '</svg>'; }
+function saleBlock(sa, title){ if (!sa || !sa.y1) return '';
+  return `<h3>${title} · 분기별 추정매출</h3>${qbars(sa.amt)}<div class="note" style="margin:8px 0 6px">2025년 매출 구성 · 점포 ${sa.stores.toLocaleString()}곳 · 연 ${won(sa.y1)}원 (전년 대비 ${spct(sa.chg)})</div><div class="grid2"><div>${bars(['남','여'], sa.g)}<div style="height:10px"></div>${bars(AGES, sa.a)}</div><div>${bars(TIMES, sa.t)}<div style="height:10px"></div>${bars(DAYS, sa.d)}</div></div>`; }
+function catTable(dongs, pick){ return '<table><thead><tr><th>업종</th><th>점포 수</th><th>2025 매출</th><th>전년 대비</th><th>점포당 월매출</th></tr></thead><tbody>'
+  + CATS.map(c => [c, saleAggC(dongs, c)]).sort((x, y) => y[1].y1 - x[1].y1).map(([c, a]) => `<tr class="${c === pick ? 'pick' : ''}" style="cursor:default"><td>${CAT[c]}</td><td>${num(a.stores)}</td><td>${won(a.y1)}</td><td>${spct(a.chg)}</td><td>${won(a.per)}</td></tr>`).join('') + '</tbody></table>'; }
+const RNOTE = `한국부동산원 ‘상업용부동산 임대동향조사’ ${RT.q[RQ-1].replace('.', '년 ').replace('Q', '분기')} 공표 통계입니다. 임대료는 1층 기준 ㎡당 월 임대료이고, 조사 대상 상권(서울 ${RT.areas.length}곳)의 표본 건물 평균이라 개별 점포의 실제 임대료와 다를 수 있습니다. 소규모 상가는 2층 이하·연면적 330㎡ 이하 건물입니다.`;
+function rentRows(o, name, sub){ return RTYPE.filter(([t]) => o[t]).map(([t, tn], i) => { const r = rlast(o, t, 0), c = rchg(o, t, 0), v = rlast(o, t, 1), vc = rchg(o, t, 1);
+  return `<tr style="cursor:default"><td>${i ? '' : `<b>${esc(name)}</b>${sub ? ` <span class="sub">${sub}</span>` : ''}`}</td><td>${tn}</td><td>${rfmt(r)}</td><td>${r == null ? '–' : won(r*1000*3.3058) + '원'}</td><td>${spct(c)}</td><td>${v == null ? '–' : v.toFixed(1) + '%'}</td><td>${vc == null ? '–' : (vc > 0 ? '+' : '') + vc.toFixed(1) + '%p'}</td></tr>`; }).join(''); }
+function rentBlock(list, title, lead){ const so = {small:RT.seoul.small, mid:RT.seoul.mid, strata:RT.seoul.strata};
+  return `<h3>${title}</h3>${lead ? `<div class="note" style="margin:0 0 6px">${lead}</div>` : ''}<div style="overflow:auto"><table><thead><tr><th>상권</th><th>유형</th><th>㎡당 월 임대료</th><th>3.3㎡당</th><th>1년 전 대비</th><th>공실률</th><th>1년 전 대비</th></tr></thead><tbody>`
+    + list.map(([i, sub]) => rentRows(RT.areas[i], RT.areas[i].n, sub)).join('') + rentRows(so, '서울 평균', '') + `</tbody></table></div>${src(RNOTE)}`; }
+function popChart(q){ const W = 448, H = 84, bw = (W-10)/PQ, mx = Math.max(...q) || 1; let s = `<svg viewBox="0 0 ${W} ${H+18}" width="100%" role="img" aria-label="분기별 유동인구">`;
+  q.forEach((v, i) => { const x = 5 + i*bw, h = v/mx*(H-6), k = PP.q[i]; s += `<rect x="${x+1.5}" y="${H-h}" width="${bw-3}" height="${h}" rx="1.5" fill="${i >= PQ-4 ? 'var(--accent)' : 'var(--closed)'}"><title>${qlab(k)} ${won(v)}명</title></rect>` + (k[4] === '1' ? `<text class="mut" x="${x+1}" y="${H+13}">'${k.slice(2, 4)}</text>` : ''); });
+  return s + '</svg>'; }
+function popBlock(d){ const p = popOf(d); if (!p) return '';
+  return `<h3>유동인구 · ${esc(S.dong[d][0])}</h3>${popChart(p.q)}<div class="note" style="margin:6px 0">최근 분기(${qlab(PP.q[PQ-1])}) ${won(p.last)}명 · 전년 같은 분기 대비 ${spct(p.yoy)} · 서울 ${Object.keys(popRank).length}개 동 중 ${popRank[d]}위. 아래는 최근 4개 분기의 구성입니다.</div><div class="grid2"><div>${bars(['남','여'], p.g)}<div style="height:10px"></div>${bars(AGES, p.a)}</div><div>${bars(TIMES, p.t)}<div style="height:10px"></div>${bars(DAYS, p.d)}</div></div>${src('서울시 상권분석서비스의 ‘길단위인구’ 추정치(분기 합계)입니다. 사람 수를 직접 센 값이 아니므로 동네 간 비교, 추세, 구성 비율 위주로 보세요.')}`; }
+const SNOTE = '매출이 ‘–’인 칸은 원자료에 값이 없는 경우이고, 전년 대비는 두 해 모두 값이 있는 분기끼리만 비교했습니다. 매출은 서울시 상권분석서비스의 추정매출(서울 열린데이터광장, 2024~2025년 분기별)이며 실제 신고 매출이 아닌 추정치입니다. 점포당 월매출은 2025년 매출을 같은 자료의 점포 수로 나눈 값입니다.';
+const src = (t, label) => `<details class="src"><summary>${label || '자료와 읽는 법'}</summary><p>${t}</p></details>`;
+const kpi = (l, v, n) => `<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="n">${n || ''}</div></div>`;
+const kpiS = (l, s, extra) => kpi(l, pct(s.rate), (s.n ? s.n.toLocaleString() + '곳 중 ' + s.k.toLocaleString() + '곳' : '해당 점포 없음') + (extra ? ' · ' + extra : ''));
+
+// ---------- 그리기
+let lastKey = '';
+function render(){ document.body.className = st.tab;
+  const key = [st.tab, st.dong, st.gu, st.cur, st.U].join('|'), P = $('panel');
+  if (key !== lastKey){ lastKey = key; P.classList.remove('fresh'); void P.offsetWidth; P.classList.add('fresh');
+    if (innerWidth <= 900 && (st.tab === 'spot' ? st.cur >= 0 : st.tab === 'region' && st.dong)) setTimeout(() => P.scrollIntoView({behavior:'smooth', block:'start'}), 80); }
+  $('hint').textContent = st.tab === 'region' ? '동네를 누르면 자세한 수치가 열립니다' : st.gu ? '점을 누르면 그 건물의 이력이 열립니다' : '지도를 누르면 그 자치구의 건물이 나타납니다';
+  document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('on', b.dataset.t === st.tab));
+  document.querySelectorAll('.ctl > *').forEach(e => { const c = [...e.classList].filter(x => x.startsWith('c-')); e.style.display = !c.length || c.includes('c-' + st.tab) ? '' : 'none'; });
+  $('gu').options[0].textContent = st.tab === 'spot' ? '자치구를 고르세요' : '서울 전체';
+  $('tip').style.display = 'none';
+  if (view){ dongLayer.visible = st.tab === 'region'; spotLayer.visible = st.tab === 'spot'; rentLayer.visible = st.tab === 'spot' || (st.tab === 'region' && st.metric === 'rent'); if (st.tab !== 'spot') selLayer.removeAll(); }
+  ({region:renderRegion, spot:renderSpot, trend:renderTrend})[st.tab](); }
+
+// ===== 1. 지역 찾기
+function renderRegion(){ paintDongs();
+  const m = st.metric, list = DONGS.filter(d => !st.gu || S.dong[d][1] === st.gu).map(d => { const a = agg([d], st.U), s = saleAgg([d], st.U); return {d, a, s, now:a.now, surv:a.n >= MINN ? a.rate : null, net:a.net, sale:s ? s.per : null, yoy:s ? s.yoy : null, pop:metricOf(a, null, 'pop', d), ppl:metricOf(a, null, 'ppl', d), rent:dongRent(d)}; });
+  const key = st.sort || m; list.sort((x, y) => (y[key] == null ? -Infinity : y[key]) - (x[key] == null ? -Infinity : x[key]));
+  const scope = st.gu ? S.gu[st.gu] : '서울', tot = agg(list.map(x => x.d), st.U);
+  let h = '<div class="wrap">';
+  if (st.dong && S.st[st.dong]){ const di = S.dong[st.dong], a = agg([st.dong], st.U), s = saleAgg([st.dong], st.U), rank = list.findIndex(x => x.d === st.dong);
+    h += `<h2>${esc(di[0])} <span class="sub">${esc(S.gu[di[1]] || '')}</span></h2><div class="sub">${esc(uName())}${rank >= 0 ? ` · ${MLAB[key]} 기준 ${scope} ${list.length}개 동 중 ${rank+1}위` : ''}</div>
+      <div class="kpis" style="margin-top:10px">${kpi('영업 중', a.now.toLocaleString() + '곳', `최근 3년 ${sgn(a.net)}`)}${kpiS('3년 생존율', a, `${scope} ${pct(tot.rate)}`)}${kpi('점포당 월매출', s ? won(s.per) : '–', s ? `2025년 · 전년 대비 ${spct(s.yoy)}` : '이 종목은 매출 분류 없음')}</div>
+      ${yearly(a.op, a.cl)}${saleBlock(s, esc(catName(st.U)))}${popBlock(st.dong)}${RT.dong[st.dong] ? rentBlock(RT.dong[st.dong].slice(0, 4).map(x => [x[0], `동 면적의 ${Math.round(x[1]*100)}%`]), '임대료·공실률 · 이 동네에 걸친 상권') : rentBlock([], '임대료·공실률', '이 동네는 한국부동산원 조사 상권에 들어 있지 않아 서울 평균만 보여 드립니다.')}<div style="margin:12px 0 4px"><button class="btn pri" data-spot="${st.dong}">이 동네에서 자리 진단하기</button></div>`;
+    if (a.n < MINN) h += `<div class="note">이 동네는 해당 종목의 표본(${a.n}곳)이 적어 생존율이 크게 흔들립니다.</div>`;
+  } else h += `<h2>${esc(scope)} · ${esc(uName())}</h2><div class="sub">지도에서 동네를 누르거나 아래 표에서 고르세요.</div>
+      <div class="kpis" style="margin-top:10px">${kpi('영업 중', tot.now.toLocaleString() + '곳', `최근 3년 ${sgn(tot.net)}`)}${kpiS('3년 생존율', tot)}${kpi('행정동', list.length + '곳', '')}</div>`;
+  const th = (k, t) => `<th data-sort="${k}" class="${key === k ? 's' : ''}" style="cursor:pointer">${t}${key === k ? ' ▼' : ''}</th>`;
+  h += `<h3>동네 순위 (제목을 누르면 그 기준으로 정렬)</h3><div class="scroll"><table><thead><tr><th>행정동</th>${th('now','영업 중')}${th('surv','3년 생존율')}${th('net','3년 순증감')}${th('sale','점포당 월매출')}${th('yoy','매출 증감')}${th('pop','유동인구')}${th('ppl','점포당 유동인구')}${th('rent','임대료(㎡)')}</tr></thead><tbody>`
+    + list.map((x, i) => `<tr data-dong="${x.d}" class="${x.d === st.dong ? 'pick' : ''}"><td>${i+1}. ${esc(S.dong[x.d][0])}${st.gu ? '' : ` <span class="sub">${esc(S.gu[S.dong[x.d][1]] || '')}</span>`}</td><td>${num(x.now)}</td><td>${pct(x.surv)}</td><td>${sgn(x.net)}</td><td>${won(x.sale)}</td><td>${spct(x.yoy)}</td><td>${won(x.pop)}</td><td>${won(x.ppl)}</td><td>${rfmt(x.rent)}</td></tr>`).join('') + '</tbody></table></div>';
+  h += `<details class="src"><summary>수치 읽는 법과 자료 출처</summary><p>3년 생존율은 2010-01 ~ ${dstr(S.cut - 30000).slice(0,7)} 개업 점포 중 3년 이상 영업한 비율이며, 해당 점포가 ${MINN}곳 미만인 동은 비워 두었습니다. 순증감은 ${S.y1-2}~${S.y1}년 개업 수에서 폐업 수를 뺀 값입니다. ${SNOTE} 인허가 종목과 매출 업종은 분류 체계가 달라 가장 가까운 것끼리 짝지었고, 짝이 없는 종목은 매출을 비워 두었습니다. 유동인구는 최근 분기(${qlab(PP.q[PQ-1])})의 추정치이고, 점포당 유동인구는 이를 선택한 종목의 영업 중 점포 수로 나눈 값입니다(점포 5곳 미만인 동은 비움). 임대료는 한국부동산원 조사 상권의 소규모 상가 값을 그 상권이 가장 넓게 걸친 동에 입힌 것이며(동 면적의 15% 이상 겹칠 때만), 지도에 보라색 점선으로 상권 구획을 함께 표시합니다. 행정동 경계는 2020년 12월 기준입니다.</p></details></div>`;
+  $('panel').innerHTML = h; }
+
+// ===== 2. 자리 진단
+function dur(r){ return r[4] === 1 || !r[3] ? null : (r[4] ? day(r[4]) : CUT) - day(r[3]); }
+const isPopup = r => r[4] > 1 && dur(r) < POPUP;
+function surv3(recs){ let k = 0, n = 0; for (const r of recs){ if (r[3] < FROM || r[3] > SURV_TO || r[4] === 1 || isPopup(r)) continue; n++; if (!r[4] || dur(r) >= 1095) k++; } return {k, n, rate: n ? k/n : null}; }
+function kmMedian(recs){ const a = recs.filter(r => r[3] >= FROM && r[4] !== 1 && !isPopup(r)).map(r => [dur(r), r[4] ? 1 : 0]).sort((x, y) => x[0]-y[0]);
+  let s = 1, risk = a.length; for (const [t, e] of a){ if (e){ s *= (risk-1)/risk; if (s <= .5) return t/30.44; } risk--; } return null; }
+function binomLE(k, n, p){ let s = 0, c = 1; for (let i = 0; i <= k; i++){ if (i) c = c*(n-i+1)/i; s += c*Math.pow(p, i)*Math.pow(1-p, n-i); } return s; }
+function distM(a, b){ const x = (a[2]-b[2])*Math.cos(a[1]*Math.PI/180)*111320, y = (a[1]-b[1])*110540; return Math.hypot(x, y); }
+const RAMP = ['#c3cbd3','#9db6e8','#5f86d6','#274a9e','#d43d2a'], lvl = n => n === 0 ? 0 : n <= 2 ? 1 : n <= 5 ? 2 : n <= 10 ? 3 : 4;
+const drawn = new Set();
+function drawGu(g){ if (!view || drawn.has(g) || !GU[g]) return;
+  if (drawn.size >= 5){ spotLayer.removeAll(); drawn.clear(); if (g !== st.gu) drawGu(st.gu); }
+  drawn.add(g); spotLayer.addMany(GU[g].b.map((b, i) => { const n = b[4].filter(r => r[3] >= 20150101 && !isPopup(r)).length;
+    return new Graphic({geometry:{type:'point', longitude:b[2], latitude:b[1]}, attributes:{g, i}, symbol:{type:'simple-marker', size:8, color:RAMP[lvl(n)], outline:{color:[255,255,255,.9], width:.6}}}); })); }
+function drawSpotLayer(){ drawGu(st.gu);
+  setLegend('<b>2015년 이후 음식점 개업</b><br>' + ['0건','1–2건','3–5건','6–10건','11건 이상'].map((t, i) => `<i style="border-radius:50%;background:${RAMP[i]}"></i>${t}`).join('<br>')); }
+function pickSpot(g, i, fly){ st.tab = 'spot'; if (g !== st.gu){ st.gu = g; $('gu').value = g; } st.cur = i; st.floor = '*'; st.unit = '*'; st.K = null; const ready = !!GU[g];
+  needGu(g, () => { if (fly){ const b = GU[g].b[i]; flyTo(b[1], b[2], 17); } if (st.tab === 'spot') render(); }); if (!ready) render(); }
+const selectSpot = (i, fly) => pickSpot(st.gu, i, fly);
+// 행정동 경계로 자치구 찾기 / 반경 안에 걸치는 이웃 자치구 찾기
+const DF = window.DONG_GEO.features.map(f => { let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; const rings = [];
+  f.geometry.coordinates.forEach(pg => pg.forEach(r => { rings.push(r); for (const c of r){ if (c[0] < x0) x0 = c[0]; if (c[0] > x1) x1 = c[0]; if (c[1] < y0) y0 = c[1]; if (c[1] > y1) y1 = c[1]; } }));
+  return {g:S.dong[f.properties.c][1], rings, x0, y0, x1, y1}; });
+function guAt(lon, lat){ for (const f of DF){ if (lon < f.x0 || lon > f.x1 || lat < f.y0 || lat > f.y1) continue; let ins = false;
+    for (const r of f.rings) for (let i = 0, j = r.length-1; i < r.length; j = i++){ const xi = r[i][0], yi = r[i][1], xj = r[j][0], yj = r[j][1]; if ((yi > lat) !== (yj > lat) && lon < (xj-xi)*(lat-yi)/(yj-yi) + xi) ins = !ins; }
+    if (ins) return f.g; } return null; }
+function nearGus(b, R){ const out = new Set(), kx = Math.cos(b[1]*Math.PI/180)*111320, ky = 110540, dx = R/kx, dy = R/ky;
+  for (const f of DF){ if (f.g === st.gu || out.has(f.g) || b[2] < f.x0-dx || b[2] > f.x1+dx || b[1] < f.y0-dy || b[1] > f.y1+dy) continue;
+    scan: for (const r of f.rings) for (let i = 1; i < r.length; i++){ const ax = (r[i-1][0]-b[2])*kx, ay = (r[i-1][1]-b[1])*ky, ux = (r[i][0]-b[2])*kx - ax, uy = (r[i][1]-b[1])*ky - ay, L = ux*ux + uy*uy, t = L ? Math.max(0, Math.min(1, -(ax*ux + ay*uy)/L)) : 0;
+      if (Math.hypot(ax + t*ux, ay + t*uy) <= R){ out.add(f.g); break scan; } } }
+  return [...out]; }
+function renderSpot(){ if (!st.gu){ setLegend('주소를 검색하거나 지도를 눌러 보세요'); $('panel').innerHTML = '<div class="empty"><h2>점찍어 둔 자리의 주소를 입력하세요</h2><p>그 건물에 어떤 가게가 얼마나 버텼는지, 주변과 비교해 어떤지 보여 드립니다.</p><p>주소를 모르면 지도를 확대해 원하는 곳을 누르세요. 그 자치구의 건물이 점으로 나타나고, 점을 누르면 진단이 열립니다.</p></div>'; return; }
+  if (!GU[st.gu]){ $('panel').innerHTML = `<div class="empty"><p>${esc(S.gu[st.gu])} 자료를 불러오는 중입니다.</p></div>`; return needGu(st.gu, () => { if (st.tab === 'spot') render(); }); }
+  drawSpotLayer(); const G = GU[st.gu], B = G.b;
+  if (view) selLayer.removeAll();
+  if (st.cur < 0 || !B[st.cur]){ $('panel').innerHTML = `<div class="empty"><h2>${esc(S.gu[st.gu])}에서 자리를 고르세요</h2><p>건물 ${B.length.toLocaleString()}곳, 음식점 인허가 ${G.all.length.toLocaleString()}건을 불러왔습니다.</p><p>주소나 상호를 검색하거나, 지도를 확대해 점을 누르세요. 점이 진할수록 2015년 이후 음식점 개업이 많았던 건물입니다.</p></div>`; return; }
+  const b = B[st.cur], R = +$('rad').value, U = st.U;
+  if (view) selLayer.addMany([new Graphic({geometry:new Circle({center:[b[2], b[1]], radius:R, radiusUnit:'meters', geodesic:true}), symbol:{type:'simple-fill', color:[224,49,43,.05], outline:{color:[224,49,43,.9], width:1}}}),
+    new Graphic({geometry:{type:'point', longitude:b[2], latitude:b[1]}, symbol:{type:'simple-marker', size:20, color:[0,0,0,0], outline:{color:[224,49,43,1], width:3}}})]);
+  const floors = [...new Set(b[4].filter(r => r[3] >= FROM || !r[4]).map(r => r[5]))].sort((x, y) => (parseInt(x.replace('B', '-')) || 99) - (parseInt(y.replace('B', '-')) || 99));
+  const spotF = b[4].filter(r => st.floor === '*' || r[5] === st.floor);
+  const units = [...new Set(spotF.filter(r => r[3] >= FROM || !r[4]).map(unitOf))].sort((x, y) => unitKey(x) - unitKey(y)), knownUnits = units.filter(u => u);
+  if (knownUnits.length < 2 || !units.includes(st.unit)) st.unit = '*';
+  const spot = st.unit === '*' ? spotF : spotF.filter(r => unitOf(r) === st.unit);
+  const others = nearGus(b, R), waiting = others.filter(g => !GU[g]);
+  waiting.forEach(g => needGu(g, () => { if (st.tab === 'spot') render(); })); others.forEach(drawGu);
+  const near = [], nearB = []; [B, ...others.filter(g => GU[g]).map(g => GU[g].b)].forEach((P, pi) => P.forEach((o, j) => { if (!(pi === 0 && j === st.cur) && Math.abs(o[1]-b[1]) < .006 && distM(b, o) <= R){ nearB.push(o); for (const r of o[4]) near.push(r); } }));
+  const sS = surv3(spot), sN = surv3(near), sA = G.s3 || (G.s3 = surv3(G.all));
+  const recent = spot.filter(r => r[3] >= FROM && !isPopup(r)), openNow = spot.filter(r => !r[4]).length, pops = spot.filter(r => r[3] >= FROM && isPopup(r)).length;
+  let v;
+  if (sS.n < 3) v = ['hold', '이력이 적어 판단하기 어렵습니다', `2010년 이후 개업해 3년이 지난 점포가 ${sS.n}곳뿐이라 자리의 좋고 나쁨을 말하기 어렵습니다. 아래 주변 수치를 참고하세요.`];
+  else if (sN.rate == null) v = ['hold', '주변에 비교할 가게가 없습니다', '반경을 넓혀 보세요.'];
+  else { const p = binomLE(sS.k, sS.n, sN.rate), gap = sN.rate - sS.rate;
+    if (gap > 0 && p < .01) v = ['warn', '주변보다 뚜렷하게 빨리 닫는 자리', `이 자리에서 3년을 버틴 곳은 ${sS.n}곳 중 ${sS.k}곳입니다. 주변 수준(${pct(sN.rate)})이라면 이런 결과가 우연히 나올 확률은 ${p < .001 ? '0.1% 미만' : (p*100).toFixed(1) + '%'}입니다.`];
+    else if (gap > .15 || (gap > 0 && p < .1)) v = ['hold', '주변보다 낮지만 단정하기는 이릅니다', `3년 생존 ${sS.n}곳 중 ${sS.k}곳으로 주변(${pct(sN.rate)})보다 낮습니다. 다만 표본이 적어 우연일 가능성(${Math.round(p*100)}%)이 남습니다.`];
+    else v = ['ok', '주변과 비슷하거나 더 오래 버티는 자리', `3년 생존 ${sS.n}곳 중 ${sS.k}곳으로 주변(${pct(sN.rate)})과 비슷하거나 높습니다.`]; }
+  const fU = r => U < 0 || r[2] === U, nearU = near.filter(fU), sNU = surv3(nearU), kmN = kmMedian(nearU), compet = nearU.filter(r => !r[4]).length;
+  const dA = b[5] ? agg([b[5]], U) : null, seoulKm = S.seoul[U] ? S.seoul[U][0] : null;
+  let h = `<div class="wrap"><h2>${esc(S.gu[st.gu])} ${esc(b[0])}</h2><div class="sub">${b[5] && S.dong[b[5]] ? esc(S.dong[b[5]][0]) + ' · ' : ''}음식점 인허가 누적 ${b[4].length}건 · 기준일 ${dstr(S.cut)}</div>`;
+  if (floors.length > 1) h += `<div class="chips"><button data-f="*" class="${st.floor === '*' ? 'on' : ''}">건물 전체</button>` + floors.map(f => `<button data-f="${f}" class="${st.floor === f ? 'on' : ''}">${f ? floorLab(f) : '층 미상'}</button>`).join('') + '</div>';
+  if (knownUnits.length >= 2){ h += `<div class="chips" style="margin-top:-2px;max-height:92px;overflow:auto"><button data-unit="*" class="${st.unit === '*' ? 'on' : ''}">호 전체</button>` + units.map(u => `<button data-unit="${esc(u)}" class="${st.unit === u ? 'on' : ''}">${u ? esc(u) : '호 미상'}</button>`).join('') + '</div>';
+    if (st.unit !== '*' && st.unit){ const seq = spot.filter(r => r[3] >= FROM && r[4] !== 1 && !isPopup(r)).sort((x, y) => x[3] - y[3]), now = spot.filter(r => !r[4]);
+      h += `<div class="note" style="margin:0 0 8px"><b style="color:var(--ink)">${esc(st.unit)}</b>에는 2010년 이후 가게가 ${seq.length}곳 들어왔습니다${seq.length > 1 ? ` (${seq.length-1}번 바뀜)` : ''}. ${now.length ? `지금은 ‘${esc(now[now.length-1][0])}’이(가) 영업 중입니다.` : '지금 영업 중인 음식점 기록은 없습니다.'}</div>`; }
+    h += `<div class="note" style="margin:0 0 8px">호 단위는 기록이 적어 판정이 ‘보류’로 나오기 쉽습니다. 주소에 호가 적히지 않은 기록은 ‘호 미상’으로 묶입니다.</div>`; }
+  h += `<div class="verdict ${v[0]}"><span class="stamp">${{warn:'주의', hold:'보류', ok:'양호'}[v[0]]}</span><div><b>${v[1]}</b><p>${v[2]}</p></div></div><div class="kpis">${kpi('2010년 이후 개업', recent.length + '곳', `현재 영업 ${openNow}곳${pops ? ' · 단기 ' + pops + '건 제외' : ''}`)}${kpiS('이 자리 3년 생존율', sS)}${kpiS(`주변 ${R}m 3년 생존율`, sN)}</div>`;
+  h += `<div class="note">${esc(S.gu[st.gu])} 전체 음식점 3년 생존율은 ${pct(sA.rate)}입니다 (${sA.n.toLocaleString()}곳).</div>`;
+  h += '<h3>이 자리의 이력 (2010년 이후)</h3>' + timeline(spot);
+  h += `<h3>주변 ${R}m · ${esc(uName())}</h3><div class="kpis">${kpi('현재 영업 중 (경쟁점)', compet + '곳', `건물 ${nearB.length}곳 안`)}${kpiS('3년 생존율', sNU, dA && dA.n >= MINN ? `동 전체 ${pct(dA.rate)}` : '')}${kpi('영업기간 중앙값', yrs(kmN), `서울 ${yrs(seoulKm)}`)}</div>`;
+  const op = new Array(NY).fill(0), cl = new Array(NY).fill(0); for (const r of nearU){ if (isPopup(r)) continue; const a = Math.floor(r[3]/10000) - S.y0, z = Math.floor(r[4]/10000) - S.y0; if (a >= 0 && a < NY) op[a]++; if (r[4] > 1 && z >= 0 && z < NY) cl[z]++; }
+  h += yearly(op, cl) + spotRent(b) + dongSales(b[5], U) + (b[5] ? popBlock(b[5]) : '') + spotSales(G, b, U, R) + (others.length ? `<div class="note">구 경계 근처라 ${others.map(g => esc(S.gu[g])).join('·')}의 가게도 주변 비교에 포함했습니다${waiting.length ? ' (이웃 구 자료를 불러오는 중이라 잠시 뒤 수치가 바뀝니다)' : ''}. 2021년 블록 단위 매출만은 선택한 구 안의 구역으로 계산합니다.</div>` : '') + '</div>';
+  $('panel').innerHTML = h; }
+// 주소 상세(r[6])에서 호를 뽑는다. 범위·나열은 첫 번째 호, 없으면 ''(호 미상)
+const UNIT_RE = /(?:(?:^|[\s,])([A-Za-z가-힣]|\d{1,3})동\s*)?(B|비|지하)?\s*(\d{1,4})(?:\s*[-~,·.]\s*(?:B|비)?\d{1,4})*\s*호/i, unitCache = new WeakMap();
+function unitOf(r){ let u = unitCache.get(r); if (u === undefined){ const m = UNIT_RE.exec(r[6] || ''); u = m ? (m[1] ? m[1].toUpperCase() + '동 ' : '') + (m[2] ? 'B' : '') + (+m[3]) + '호' : ''; unitCache.set(r, u); } return u; }
+const unitKey = u => { const m = /(B?)(\d+)호$/.exec(u); return !m ? 1e9 : (m[1] ? -1e5 : 0) + (+m[2]) + (u.includes('동 ') ? u.charCodeAt(0)*1e4 : 0); };
+const floorLab = f => f ? f.replace(/^B(\d)/, '지하$1층').replace(/F$/, '층') : '';
+const fmt = n => `${Math.floor(n/10000)}-${String(Math.floor(n/100)%100).padStart(2, '0')}`;
+function timeline(recs){ const rows = recs.filter(r => r[3] && r[4] !== 1 && (!r[4] || r[4] >= FROM)).sort((a, b) => (a[5] > b[5]) - (a[5] < b[5]) || unitKey(unitOf(a)) - unitKey(unitOf(b)) || a[3]-b[3]);
+  if (!rows.length) return '<div class="sub">2010년 이후 영업한 음식점 기록이 없습니다.</div>';
+  const hasU = rows.some(r => unitOf(r)), NX = hasU ? 44 : 0;
+  const MAX = 60, show = rows.slice(-MAX), W = 468, LW = 132, RH = 18, x0 = day(FROM), xs = t => LW + (Math.max(t, x0)-x0)/(CUT-x0)*(W-LW-6);
+  let s = `<svg viewBox="0 0 ${W} ${show.length*RH+22}" width="100%" role="img" aria-label="점포별 영업 기간">`;
+  const YE = Math.floor(S.cut/10000);
+  for (const y of [2010, 2015, 2020, YE]){ const x = xs(day(y*10000+101)); s += `<line x1="${x}" x2="${x}" y1="14" y2="${show.length*RH+20}" stroke="var(--line)"/><text class="mut" x="${y === YE ? x-2 : x+2}" y="10" text-anchor="${y === YE ? 'end' : 'start'}">${y}</text>`; }
+  show.forEach((r, i) => { const y = 18 + i*RH, a = xs(day(r[3])), e = xs(r[4] ? day(r[4]) : CUT), c = !r[4] ? 'var(--open)' : isPopup(r) ? 'var(--popup)' : 'var(--closed)';
+    const d = dur(r), life = d < 365 ? Math.max(1, Math.round(d/30.44)) + '개월' : (d/365.25).toFixed(1) + '년', NL = hasU ? 8 : 11, nm = r[0].length > NL ? r[0].slice(0, NL-1) + '…' : r[0];
+    const u = unitOf(r), gk = r[5] + '|' + u, first = hasU && (i === 0 || gk !== show[i-1][5] + '|' + unitOf(show[i-1])), place = [floorLab(r[5]), u].filter(Boolean).join(' ');
+    const tip = `${r[0]} · ${S.upt[r[2]]} · ${fmt(r[3])} ~ ${r[4] ? fmt(r[4]) : '영업 중'} (${life})${place ? ' · ' + place : ''}${r[6] && r[6] !== place ? ' · ' + r[6] : ''}`;
+    if (first && i) s += `<line x1="0" x2="${W}" y1="${y}" y2="${y}" stroke="var(--line)"/>`;
+    s += `<g><title>${esc(tip)}</title>${first ? `<text class="mut" x="0" y="${y+11}" style="font-size:10px">${esc(u ? u.replace(/^(.)동 /, '$1-') : '호 미상')}</text>` : ''}<text x="${NX}" y="${y+11}">${esc(nm)}</text><rect x="${a}" y="${y+2}" width="${Math.max(2, e-a)}" height="${RH-6}" rx="2" fill="${c}"/>`
+       + (e-a > 34 ? `<text x="${a+4}" y="${y+11.5}" style="fill:#fff;font-size:10px">${life}</text>` : `<text class="mut" x="${e+3 > W-34 ? a-34 : e+3}" y="${y+11.5}" style="font-size:10px">${life}</text>`) + '</g>'; });
+  return s + '</svg><div class="legend"><span><i style="background:var(--open)"></i>영업 중</span><span><i style="background:var(--closed)"></i>폐업</span><span><i style="background:var(--popup)"></i>90일 미만(팝업 추정, 통계 제외)</span></div>'
+    + (rows.length > MAX ? `<div class="note">최근 ${MAX}건만 표시했습니다 (전체 ${rows.length}건). 층을 고르면 좁혀집니다.</div>` : '') + '<div class="note">막대에 마우스를 올리면 상호·업태·기간이 나옵니다.</div>'; }
+function dongSales(dong, U){ if (!dong || !SL.d[dong]) return ''; const c = catOf(U), sa = U >= 0 && !c ? null : saleAggC([dong], c);
+  return `<h3>이 동네(${esc(S.dong[dong][0])}) 2025년 추정매출</h3>${catTable([dong], c)}${saleBlock(sa, esc(catName(U))).replace('<h3>', '<h3 style="margin-top:14px">')}${src(SNOTE)}`; }
+function spotRent(b){ const k = areaAt(b[2], b[1]);
+  if (k >= 0) return rentBlock([[k, '']], '임대료·공실률 · 이 자리가 속한 상권', `이 자리는 한국부동산원 조사 상권 <b style="color:var(--ink)">${esc(RT.areas[k].n)}</b> 구획 안에 있습니다.`);
+  const l = b[5] && RT.dong[b[5]];
+  return l ? rentBlock(l.slice(0, 3).map(x => [x[0], '']), '임대료·공실률 · 같은 동에 걸친 상권', '이 자리는 조사 상권 구획 밖입니다. 같은 동네에 걸친 상권의 수치를 참고로 보여 드립니다.')
+           : rentBlock([], '임대료·공실률', '이 자리와 동네는 한국부동산원 조사 상권에 들어 있지 않아 서울 평균만 보여 드립니다.'); }
+function spotSales(G, b, U, R){ if (!G.sales || !Object.keys(G.sales).length) return '';   // 공개용 묶음에는 2021년 BC카드 자료가 없다
+  if (!G.cen){ G.cen = {}; G.b.forEach(o => { if (!o[3]) return; const c = G.cen[o[3]] || (G.cen[o[3]] = [0, 0, 0]); c[0] += o[1]; c[1] += o[2]; c[2]++; }); }
+  const suds = new Set([b[3]]); for (const s in G.cen){ const c = G.cen[s]; if (distM(b, [0, c[0]/c[2], c[1]/c[2]]) <= R) suds.add(s); }
+  const ag = {}; let nS = 0;
+  for (const s of suds){ const d = G.sales[s]; if (!d) continue; nS++; for (const k in d){ const e = d[k], a = ag[k] || (ag[k] = {mct:0, amt:0, cnt:0, g:[0,0], a:[0,0,0,0,0,0], t:[0,0,0,0,0,0], d:[0,0,0,0,0,0,0]});
+    a.mct += e[0].reduce((x, y) => x+y, 0); a.amt += e[1].reduce((x, y) => x+y, 0); a.cnt += e[2]; e[3].forEach((v, i) => a.g[i] += v); e[4].forEach((v, i) => a.a[i] += v); e[5].forEach((v, i) => a.t[i] += v); e[6].forEach((v, i) => a.d[i] += v); } }
+  let h = `<details class="fold"><summary>참고: 2021년 블록 단위 카드매출</summary><div class="note" style="margin:0 0 8px">BC카드 결제분, 주변 ${R}m 안 ${nS}개 구역</div>`; const ks = Object.keys(ag).sort((x, y) => ag[y].amt - ag[x].amt);
+  if (!ks.length) return h + '<div class="sub">이 주변은 매출 자료가 없습니다.</div></details>';
+  const pick = st.K && ag[st.K] ? st.K : (U >= 0 && ag[U2K[S.upt[U]]] ? U2K[S.upt[U]] : +ks[0]);
+  h += '<table><thead><tr><th>업종</th><th>가맹점(월평균)</th><th>연 매출</th><th>점포당 월 매출</th><th>건당</th></tr></thead><tbody>'
+    + ks.map(k => { const a = ag[k]; return `<tr data-k="${k}" class="${+k === +pick ? 'pick' : ''}"><td>${KSIC[k] || k}</td><td>${(a.mct/12).toFixed(1)}</td><td>${won(a.amt)}</td><td>${a.mct ? won(a.amt/a.mct) : '–'}</td><td>${a.cnt ? Math.round(a.amt/a.cnt).toLocaleString() : '–'}</td></tr>`; }).join('') + '</tbody></table>';
+  const a = ag[pick];
+  return h + `<div class="note" style="margin:10px 0 6px"><b style="color:var(--ink)">${KSIC[pick] || pick}</b> 매출 구성 (표의 행을 누르면 바뀝니다)</div><div class="grid2"><div>${bars(['남','여'], a.g)}<div style="height:10px"></div>${bars(AGES, a.a)}</div>`
+    + `<div>${bars(TIMES, a.t)}<div style="height:10px"></div>${bars(DAYS, a.d)}</div></div>`
+    + '<div class="note">행정동보다 좁은 블록 단위로 볼 수 있는 유일한 자료라 남겨 두었습니다. BC카드 결제분만 집계한 2021년(코로나 시기) 값이라 금액은 위 2025년 표를 기준으로 보세요.</div></details>'; }
+
+// ===== 3. 업계 동향
+function renderTrend(){ const U = st.U, a = agg(DONGS, U), all = agg(DONGS, -1), se = S.seoul[U] || [null, []], L1 = NY-1, s = saleAgg(DONGS, U);
+  const chg = a.op[L1] - a.cl[L1], share = all.now ? a.now/all.now : 0;
+  let h = `<div class="wrap"><div class="full"><h2>${esc(uName())} · 서울 전체</h2><div class="sub">인허가 기준일 ${dstr(S.cut)} · 연도별 수치는 ${S.y1}년까지${U >= 0 ? ` · 서울 음식점의 ${pct(share)}` : ''}</div>
+    <div class="kpis k5" style="margin-top:10px">${kpi('영업 중', a.now.toLocaleString() + '곳', `최근 3년 ${sgn(a.net)}`)}${kpi(`${S.y1}년 개업`, a.op[L1].toLocaleString() + '곳', `전년 ${a.op[L1-1].toLocaleString()}곳`)}${kpi(`${S.y1}년 폐업`, a.cl[L1].toLocaleString() + '곳', `전년 ${a.cl[L1-1].toLocaleString()}곳 · 순증감 ${sgn(chg)}`)}${kpiS('3년 생존율', a, U >= 0 ? `전체 ${pct(all.rate)}` : '')}${kpi('영업기간 중앙값', yrs(se[0]), U >= 0 ? `전체 ${yrs(S.seoul[-1][0])}` : '2010년 이후 개업 기준')}</div></div>`;
+  if (s && s.y1) h += `<div><h3>${esc(catName(U))} · 분기별 추정매출 (서울)</h3>${qbars(s.amt, 540)}<div class="note">2025년 ${won(s.y1)}원, 전년 대비 ${spct(s.chg)} · 점포당 월 ${won(s.per)}원 · 점포 ${s.stores.toLocaleString()}곳</div></div><div><h3>2025년 매출 구성</h3><div class="grid2"><div>${bars(['남','여'], s.g)}<div style="height:10px"></div>${bars(AGES, s.a)}</div><div>${bars(TIMES, s.t)}<div style="height:10px"></div>${bars(DAYS, s.d)}</div></div></div>`;
+  else if (U >= 0) h += `<div class="full note">‘${esc(uName())}’ 종목은 매출 자료의 업종 분류와 짝이 없어 매출을 표시하지 않습니다.</div>`;
+  h += `<div><h3>연도별 개업·폐업</h3>${yearly(a.op, a.cl, 540)}</div>`;
+  h += `<div><h3>개업 연도별 3년 생존율 (그해 문 연 가게가 3년 뒤에도 영업한 비율)</h3>${se[1].length ? cohort(se[1], U >= 0 ? S.seoul[-1][1] : null) : '<div class="sub">자료 없음</div>'}</div>`;
+  const rows = S.upt.map((u, i) => ({i, u, a:uptTot[i], km:S.seoul[i] ? S.seoul[i][0] : null})).filter(x => x.a.now >= 200).sort((x, y) => y.a.now - x.a.now);
+  h += `<div><h3>종목별 비교 (행을 누르면 그 종목으로 바뀝니다)</h3><div class="scroll"><table><thead><tr><th>종목</th><th>영업 중</th><th>${S.y1} 개업</th><th>${S.y1} 폐업</th><th>3년 순증감</th><th>3년 생존율</th><th>영업기간</th></tr></thead><tbody>`
+    + rows.map(x => `<tr data-u="${x.i}" class="${x.i === U ? 'pick' : ''}"><td>${esc(x.u)}</td><td>${num(x.a.now)}</td><td>${num(x.a.op[L1])}</td><td>${num(x.a.cl[L1])}</td><td>${sgn(x.a.net)}</td><td>${pct(x.a.rate)}</td><td>${yrs(x.km)}</td></tr>`).join('') + '</tbody></table></div>'
+    + src('종목은 인허가 대장의 ‘업태’ 분류입니다. 신고할 때 고른 값이라 ‘기타’가 많고, 실제 메뉴와 다를 수 있습니다.') + '</div>';
+  const gr = GUS.map(g => { const ds = DONGS.filter(d => S.dong[d][1] === g), x = agg(ds, U), sl = saleAgg(ds, U); return {g, x, sl}; }).sort((p, q) => q.x.now - p.x.now);
+  h += `<div><h3>자치구별 · ${esc(uName())} (행을 누르면 지역 찾기로 이동)</h3><div class="scroll"><table><thead><tr><th>자치구</th><th>영업 중</th><th>3년 순증감</th><th>3년 생존율</th><th>점포당 월매출</th><th>매출 증감</th></tr></thead><tbody>`
+    + gr.map(r => `<tr data-gu="${r.g}"><td>${esc(S.gu[r.g])}</td><td>${num(r.x.now)}</td><td>${sgn(r.x.net)}</td><td>${r.x.n >= MINN ? pct(r.x.rate) : '–'}</td><td>${r.sl ? won(r.sl.per) : '–'}</td><td>${r.sl ? spct(r.sl.yoy) : '–'}</td></tr>`).join('') + '</tbody></table></div>'
+    + `<div class="note">점포당 월매출과 매출 증감은 2025년 추정매출 기준${U >= 0 && !s ? '이며, 이 종목은 대응하는 매출 업종이 없어 비워 두었습니다' : ''}.</div></div>`;
+  const ra = RT.areas.map((a, i) => i).sort((x, y) => (rlast(RT.areas[y], 'small', 0) ?? rlast(RT.areas[y], 'mid', 0) ?? -1) - (rlast(RT.areas[x], 'small', 0) ?? rlast(RT.areas[x], 'mid', 0) ?? -1));
+  const cell = (a, t) => `<td>${rfmt(rlast(a, t, 0))}</td><td>${spct(rchg(a, t, 0))}</td><td>${rlast(a, t, 1) == null ? '–' : rlast(a, t, 1).toFixed(1) + '%'}</td>`;
+  h += `<div class="full"><h3>서울 상권별 임대료·공실률 (${RT.q[RQ-1]}, ㎡당 월 임대료 · 1년 전 대비 · 공실률)</h3><div class="scroll"><table><thead><tr><th>상권</th><th>소규모 임대료</th><th>1년 전 대비</th><th>공실률</th><th>중대형 임대료</th><th>1년 전 대비</th><th>공실률</th></tr></thead><tbody>`
+    + ra.map(i => { const a = RT.areas[i]; return `<tr style="cursor:default"><td>${esc(a.n)} <span class="sub">${esc(S.gu[a.gu] || '')}</span></td>${cell(a, 'small')}${cell(a, 'mid')}</tr>`; }).join('')
+    + `<tr style="cursor:default"><td><b>서울 평균</b></td>${cell(RT.seoul, 'small')}${cell(RT.seoul, 'mid')}</tr></tbody></table></div>${src(RNOTE)}</div>`;
+  h += `<div class="full"><h3>2025년 서울 외식업 추정매출 · 업종별</h3>${catTable(DONGS, catOf(U))}${src(SNOTE + ' 매출 업종(10개)과 인허가 종목(업태)은 서로 다른 분류 체계라 가장 가까운 것끼리 짝지었습니다.')}</div></div>`;
+  $('panel').innerHTML = h; $('panel').scrollTop = 0; }
+
+// ---------- 패널 클릭
+$('panel').addEventListener('click', e => { let t;
+  if ((t = e.target.closest('[data-sort]'))){ st.sort = t.dataset.sort; return render(); }
+  if ((t = e.target.closest('[data-spot]'))){ const d = S.dong[t.dataset.spot]; st.gu = d[1]; $('gu').value = d[1]; st.cur = -1; st.tab = 'spot'; render(); flyTo(d[2], d[3], 16); return; }
+  if ((t = e.target.closest('[data-dong]'))){ st.dong = t.dataset.dong; const d = S.dong[st.dong]; if (view) flyTo(d[2], d[3], Math.max(Math.round(view.zoom), 13)); render(); $('panel').scrollTop = 0; return; }
+  if ((t = e.target.closest('[data-u]'))){ st.U = +t.dataset.u; $('upt').value = st.U; if ($('upt').value !== String(st.U)) $('upt').value = '-1'; return render(); }
+  if ((t = e.target.closest('[data-gu]'))){ st.gu = t.dataset.gu; $('gu').value = st.gu; st.dong = null; st.tab = 'region'; $('gu').onchange(); return; }
+  if ((t = e.target.closest('[data-f]'))){ st.floor = t.dataset.f; st.unit = '*'; return render(); }
+  if ((t = e.target.closest('[data-unit]'))){ st.unit = t.dataset.unit; return render(); }
+  if ((t = e.target.closest('[data-k]'))){ st.K = +t.dataset.k; const y = $('panel').scrollTop; render(); $('panel').scrollTop = y; } });
+let ADN = null;
+function addrIndex(){ if (!ADN && window.ADDR){ ADN = {}; for (const g in ADDR) ADN[g] = ADDR[g].map(k => (S.gu[g] + k).replace(/\s/g, '')); } return ADN; }
+$('q').addEventListener('input', () => { const box = $('results'), raw = $('q').value.trim().toLowerCase(), q = raw.replace(/\s+/g, ' '), qn = raw.replace(/\s/g, '').replace(/^서울(특별시|시)?/, '');
+  if (q.length < 2){ box.style.display = 'none'; return; }
+  const A = addrIndex(), G = GU[st.gu], out = [], seen = new Set();
+  if (A && qn.length >= 2) for (const g of [st.gu, ...GUS.filter(x => x !== st.gu)]){ const a = A[g]; if (!a) continue;
+    for (let i = 0; i < a.length && out.length < 40; i++) if (a[i].includes(qn)){ out.push([g, i, '', a[i].endsWith(qn) ? 0 : 1]); seen.add(g + ':' + i); }
+    if (out.length >= 40) break; }
+  out.sort((x, y) => x[3] - y[3]);
+  if (G) for (let i = 0; i < G.b.length && out.length < 55; i++) if (!seen.has(st.gu + ':' + i) && G.idx[i].includes(q)) out.push([st.gu, i, G.b[i][4].filter(r => r[0].toLowerCase().includes(q)).slice(-2).map(r => r[0]).join(', ')]);
+  box.innerHTML = out.map(([g, i, m]) => `<div data-g="${g}" data-i="${i}">${esc(S.gu[g])} ${esc(A ? ADDR[g][i] : GU[g].b[i][0])}${m ? `<small>${esc(m)}</small>` : ''}</div>`).join('') || `<div>${A ? '결과 없음' : '주소 목록을 불러오는 중입니다. 잠시 뒤 다시 입력해 주세요.'}</div>`;
+  box.style.display = 'block'; });
+$('panel').addEventListener('mouseover', e => { if (st.tab !== 'region' || !view) return; const t = e.target.closest('tr[data-dong]'); hoverDong(t ? t.dataset.dong : null, false); });
+$('panel').addEventListener('mouseleave', () => hoverDong(null, false));
+// 검색 결과는 화살표와 Enter 로도 고른다
+$('q').addEventListener('keydown', e => { const box = $('results'), items = [...box.querySelectorAll('[data-i]')]; if (!items.length || box.style.display === 'none') return;
+  let k = items.findIndex(x => x.classList.contains('act'));
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp'){ e.preventDefault(); if (k >= 0) items[k].classList.remove('act'); k = (k + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length; items[k].classList.add('act'); items[k].scrollIntoView({block:'nearest'}); }
+  else if (e.key === 'Enter'){ e.preventDefault(); (items[Math.max(k, 0)]).click(); }
+  else if (e.key === 'Escape'){ box.style.display = 'none'; } });
+$('results').addEventListener('click', e => { const d = e.target.closest('[data-i]'); if (d){ $('results').style.display = 'none'; pickSpot(d.dataset.g, +d.dataset.i, true); } });
+document.addEventListener('click', e => { if (!e.target.closest('.search')) $('results').style.display = 'none'; });
+$('asof').innerHTML = `인허가 ${dstr(S.cut)} 기준, 매출 2025년<br>유동인구 ${qlab(PP.q[PQ-1])}, 임대료 ${RT.q[RQ-1].replace('.', '년 ').replace('Q', '분기')}`;
+render(); initMap();
+{ const sa = document.createElement('script'); sa.src = 'data/addr.js'; document.head.appendChild(sa); }
+</script>
+</body>
+</html>
