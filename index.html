@@ -134,6 +134,17 @@ tr.hov td{background:var(--weak)}
 @media (max-width:900px){nav button small{display:none}nav button{padding:6px 10px 8px}.ctl{gap:8px}.ctl label{flex:1 1 44%}.ctl select{flex:1;min-width:0}.search{flex:1 1 100%;max-width:none;order:-1}.grid2{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(2,1fr)}.kpis .kpi:nth-child(odd){border-left:0;padding-left:0}.kpis .kpi:nth-child(n+3){border-top:1px solid var(--line)}.kpi .v{font-size:21px}#hint{display:none}}
 
 /* 접어 둔 설명 */
+.hsrc{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.srcb{flex:none;font:inherit;font-size:11px;font-weight:500;line-height:1;color:var(--sub);background:transparent;border:1px solid var(--line);border-radius:999px;padding:4px 8px;cursor:pointer;margin-top:2px}
+.srcb:hover,.srcb.on{color:var(--accent);border-color:var(--accent)}
+.srcb:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.srcb.mini{width:16px;height:16px;padding:0;font-size:10px;font-style:italic;font-family:Georgia,serif;margin-top:0}
+.srcb.in{margin-left:auto;margin-top:0}
+.srcbox{font-size:12.5px;line-height:1.55;color:var(--sub);background:color-mix(in srgb,var(--accent) 5%,var(--card));border-left:2px solid var(--accent);padding:9px 12px;margin:8px 0 10px;max-width:72ch}
+.srcbox b{display:block;color:var(--ink);font-weight:600}
+.srcbox b+ul{margin:2px 0 6px;padding-left:16px}.srcbox ul:last-child{margin-bottom:0}
+.legend i.ln{width:14px;height:3px;border-radius:2px}
+.yhit:hover{fill:var(--ink);fill-opacity:.05}
 details.src{margin-top:10px;font-size:12.5px;color:var(--sub)}
 details.src>summary{cursor:pointer;display:inline-block;text-decoration:underline dotted;text-underline-offset:3px}
 details.src>summary::-webkit-details-marker{display:none}
@@ -339,14 +350,20 @@ function needGu(code, cb){ if (GU[code]) return cb(); if (loading[code]) return 
 function prep(code){ const g = GU[code]; g.idx = g.b.map(b => (b[0] + ' ' + b[4].map(r => r[0]).join(' ')).toLowerCase()); g.all = []; g.b.forEach(b => { for (const r of b[4]) g.all.push(r); }); }
 
 // ---------- 그림 조각
-function yearly(op, cl, w){ const W = w || 448, H = 110, bw = (W-10)/NY; let mx = 1; for (let i = 0; i < NY; i++) mx = Math.max(mx, op[i], cl[i]);
+function yearly(op, cl, w){ const W = w || 448, H = 132, ML = 46, MR = 46, T = 14; let mx = 1, mn = Infinity; for (let i = 0; i < NY; i++){ mx = Math.max(mx, op[i], cl[i]); mn = Math.min(mn, op[i], cl[i]); }
+  const lo0 = mn > mx*.5 ? mn : 0, raw = Math.max(1, (mx-lo0)/2), p10 = Math.pow(10, Math.floor(Math.log10(raw))), stp = Math.max(1, [1, 2, 2.5, 5, 10].map(k => k*p10).find(v => v >= raw)), lo = Math.floor(lo0/stp)*stp, top = lo + stp*Math.max(1, Math.ceil((mx-lo)/stp)), step = (W-ML-MR)/(NY-1), ticks = []; for (let v = lo; v <= top + 1e-9; v += stp) ticks.push(v);
+  const x = i => ML + i*step, y = v => T + (1 - (v-lo)/(top-lo))*(H-T), pts = a => Array.from({length:NY}, (_, i) => x(i) + ' ' + y(a[i])).join('L');
   let s = `<svg viewBox="0 0 ${W} ${H+18}" width="100%" role="img" aria-label="연도별 개업·폐업 수" style="margin-top:6px">`;
-  for (let i = 0; i < NY; i++){ const x = 5 + i*bw, ho = op[i]/mx*(H-16), hc = cl[i]/mx*(H-16), y = S.y0+i, show = bw > 40;
-    s += ``
-       + vbar(x+2, H-ho, bw/2-3, ho, 'var(--open)', `${y}년 개업 ${op[i].toLocaleString()}`) + vbar(x+bw/2+1, H-hc, bw/2-3, hc, 'var(--closed)', `${y}년 폐업 ${cl[i].toLocaleString()}`)
-       + (show ? `<text x="${x+bw/4}" y="${H-ho-3}" text-anchor="middle" style="font-size:10px">${op[i]}</text><text class="mut" x="${x+bw*3/4}" y="${H-hc-3}" text-anchor="middle" style="font-size:10px">${cl[i]}</text>` : '')
-       + `<text class="mut" x="${x+bw/2}" y="${H+13}" text-anchor="middle">${bw > 34 ? y : "'" + String(y).slice(2)}</text>`; }
-  return s + '</svg><div class="legend"><span><i style="background:var(--open)"></i>개업</span><span><i style="background:var(--closed)"></i>폐업</span><span>막대에 마우스를 올리면 건수가 나옵니다</span></div>'; }
+  for (const v of ticks) s += `<line x1="${ML}" x2="${W-MR}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text class="mut" x="${ML-5}" y="${y(v)+4}" text-anchor="end">${v.toLocaleString()}</text>`;
+  for (const [a, c] of [[cl, 'var(--closed)'], [op, 'var(--open)']]) s += `<path d="M${x(0)} ${y(lo)}L${pts(a)}L${x(NY-1)} ${y(lo)}z" fill="${c}" opacity=".09"/>`;
+  for (const [a, c] of [[cl, 'var(--closed)'], [op, 'var(--open)']]){ s += `<path d="M${pts(a)}" fill="none" stroke="${c}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    for (let i = 0; i < NY; i++) s += `<circle cx="${x(i)}" cy="${y(a[i])}" r="${i === NY-1 ? 3.5 : 2.5}" fill="${c}" stroke="var(--card)" stroke-width="1.5"/>`; }
+  const e = NY-1, up = op[e] >= cl[e], yo = y(op[e]) + (up ? -6 : 13), yc = y(cl[e]) + (up ? 13 : -6);
+  s += `<text x="${x(e)+6}" y="${yo}" style="font-size:10.5px;font-weight:600">${op[e].toLocaleString()}</text><text x="${x(e)+6}" y="${yc}" style="font-size:10.5px;font-weight:600">${cl[e].toLocaleString()}</text>`;
+  for (let i = 0; i < NY; i++){ const yr = S.y0+i, d = op[i]-cl[i];
+    s += `<text class="mut" x="${x(i)}" y="${H+13}" text-anchor="middle">${step > 34 ? yr : "'" + String(yr).slice(2)}</text>`
+       + `<rect class="yhit" x="${x(i)-step/2}" y="0" width="${step}" height="${H}" fill="transparent"><title>${yr}년 개업 ${op[i].toLocaleString()} · 폐업 ${cl[i].toLocaleString()} (${d >= 0 ? '개업이 ' + d.toLocaleString() + ' 많음' : '폐업이 ' + (-d).toLocaleString() + ' 많음'})</title></rect>`; }
+  return s + `</svg><div class="legend"><span><i class="ln" style="background:var(--open)"></i>개업</span><span><i class="ln" style="background:var(--closed)"></i>폐업</span><span>초록 선이 위에 있으면 개업이 더 많은 해입니다${lo > 0 ? ' · 세로축은 ' + lo.toLocaleString() + '부터' : ''}</span><button class="srcb in" data-src="permit" type="button">출처</button></div>`; }
 function cohort(c, base){ const W = 520, H = 150, n = c.length, x = i => 34 + i*(W-50)/(n-1), y = v => 12 + (1-v)*(H-34);
   const line = (a, col, wd) => { let d = '', pen = false; a.forEach((e, i) => { if (e[1] < MINN){ pen = false; return; } d += (pen ? 'L' : 'M') + x(i) + ' ' + y(e[0]/e[1]); pen = true; }); return `<path d="${d}" fill="none" stroke="${col}" stroke-width="${wd}"/>`; };
   let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="개업 연도별 3년 생존율">`;
@@ -564,6 +581,23 @@ function renderTrend(){ const U = st.U, a = agg(DONGS, U), all = agg(DONGS, -1),
   $('panel').innerHTML = h; $('panel').scrollTop = 0; }
 
 // ---------- 패널 클릭
+// ---------- 항목별 출처 (제목·지표 오른쪽 위 버튼)
+const SRCS = {
+  permit: ['음식점 인허가 대장', ['행정안전부 지방행정 인허가 데이터 (일반음식점·휴게음식점·제과점영업)', '서울: 서울 열린데이터광장의 서울시 인허가 정보', '수원·화성: 지방행정 인허가 데이터 개방(localdata.go.kr)의 지역별 파일', `기준일 ${dstr(S.cut)} · 2010년 이후의 개업일·폐업일로 건수, 3년 생존율, 영업기간을 계산했습니다`, '생존율 계산에서는 90일 안에 닫은 기록을 뺐습니다']],
+  sales: ['추정매출', ['서울시 상권분석서비스 ‘추정매출-행정동’ (서울 열린데이터광장)', '2024~2025년 분기별 · 점포 수는 같은 서비스의 ‘점포-행정동’', '카드 결제 등을 바탕으로 한 추정치이며 신고 매출이 아닙니다', '서울만 있습니다 (수원·화성 없음)']],
+  pop: ['유동인구', ['서울시 상권분석서비스 ‘길단위인구-행정동’ (서울 열린데이터광장)', '2021년 1분기 ~ 2026년 2분기 분기 합계', '사람 수를 직접 센 값이 아닌 추정치입니다', '서울만 있습니다 (수원·화성 없음)']],
+  rent: ['임대료·공실률', ['한국부동산원 ‘상업용부동산 임대동향조사’ 상가 통계표와 상권 구획도 (R-ONE 공표보고서)', `${RT.q[RQ-1].replace('.', '년 ').replace('Q', '분기')} 공표 · 최근 8개 분기`, '조사 대상 상권의 표본 건물 평균이라 개별 점포의 실제 임대료와 다를 수 있습니다']],
+  bc: ['(예시) 블록 단위 카드매출', ['2021년 블록 단위 카드매출 표본', '일부 카드사 결제분만 담은 표본이라 지금의 실제 매출을 나타내지 않습니다']] };
+const srcKeys = t => /카드매출/.test(t) ? ['bc'] : /동네 순위/.test(t) ? ['permit', 'sales', 'pop', 'rent'] : /자치구별/.test(t) ? ['permit', 'sales'] : /점포당 유동인구/.test(t) ? ['pop', 'permit'] : /임대료|공실/.test(t) ? ['rent'] : /유동인구/.test(t) ? ['pop'] : /매출/.test(t) ? ['sales'] : ['permit'];
+const srcBox = keys => `<div class="srcbox">${keys.map(k => `<b>${SRCS[k][0]}</b><ul>${SRCS[k][1].map(x => `<li>${x}</li>`).join('')}</ul>`).join('')}</div>`;
+function addSrcButtons(){ for (const el of $('panel').querySelectorAll('h3, details.fold>summary, .kpi .l')){ if (el.querySelector('.srcb')) continue;
+    const k = srcKeys(el.textContent), kp = el.classList.contains('l'), b = document.createElement('button'); b.type = 'button'; b.className = 'srcb' + (kp ? ' mini' : ''); b.dataset.src = k.join(','); b.textContent = kp ? 'i' : '출처'; b.title = '어디서 가져온 자료인지 보기'; b.setAttribute('aria-label', '자료 출처 보기'); el.classList.add('hsrc'); el.appendChild(b); }
+  for (const b of $('panel').querySelectorAll('.srcb.in')){ const sv = b.parentElement.previousElementSibling, hd = sv && sv.previousElementSibling; if (hd && hd.tagName === 'H3') b.remove(); } }
+new MutationObserver(addSrcButtons).observe($('panel'), {childList:true});
+$('panel').addEventListener('click', e => { const b = e.target.closest('.srcb'); if (!b) return; e.preventDefault(); e.stopPropagation();
+  const host = b.closest('.kpis') || b.closest('.legend') || b.closest('h3') || b.closest('details') , on = b.classList.contains('on');
+  for (const o of $('panel').querySelectorAll('.srcbox')) o.remove(); for (const o of $('panel').querySelectorAll('.srcb.on')){ o.classList.remove('on'); o.setAttribute('aria-expanded', 'false'); }
+  if (on || !host) return; b.classList.add('on'); b.setAttribute('aria-expanded', 'true'); host.insertAdjacentHTML('afterend', srcBox(b.dataset.src.split(','))); }, true);
 $('panel').addEventListener('click', e => { let t;
   if ((t = e.target.closest('[data-sort]'))){ st.sort = t.dataset.sort; return render(); }
   if ((t = e.target.closest('[data-spot]'))){ const d = S.dong[t.dataset.spot]; st.gu = d[1]; $('gu').value = d[1]; st.cur = -1; st.tab = 'spot'; render(); flyTo(d[2], d[3], 16); return; }
