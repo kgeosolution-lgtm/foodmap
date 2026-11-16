@@ -157,6 +157,13 @@ button.back{font:inherit;font-size:12.5px;color:var(--accent);background:none;bo
 tr.gup td{background:color-mix(in srgb,#e0412b 6%,var(--card))}
 tr[data-area]{cursor:pointer}tr.apick td{box-shadow:inset 0 -2px #e0412b}
 @media (max-width:900px){.gstages{grid-template-columns:repeat(2,1fr)}}
+.prs{display:grid;gap:7px;margin-top:4px}.pr{display:grid;grid-template-columns:minmax(120px,1.3fr) minmax(70px,1.6fr) 44px minmax(70px,1fr);gap:10px;align-items:center;font-size:13px}.pr b{text-align:right;font-variant-numeric:tabular-nums}
+.rank.wide{width:100%;height:10px;border-radius:5px;margin:0}.rank.wide div{border-radius:5px}
+.cmpbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 10px;margin:0 0 14px;background:var(--weak);border-radius:6px}
+.chipx{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:2px 4px 2px 10px}.chipx button{font:inherit;border:0;background:none;cursor:pointer;color:var(--sub);padding:0 5px;font-size:14px;line-height:1}.chipx button:hover{color:var(--ink)}
+.cmpbar .btn{margin-left:auto}.btn:disabled{opacity:.5;cursor:default}
+table.cmp td,table.cmp th{text-align:right}table.cmp td:first-child,table.cmp th:first-child{text-align:left;color:var(--sub)}td.bestc{font-weight:600;box-shadow:inset 0 -2px var(--accent)}
+#share{margin-left:auto;align-self:center}
 details.src{margin-top:10px;font-size:12.5px;color:var(--sub)}
 details.src>summary{cursor:pointer;display:inline-block;text-decoration:underline dotted;text-underline-offset:3px}
 details.src>summary::-webkit-details-marker{display:none}
@@ -181,11 +188,12 @@ details.fold[open]>summary::after{content:" 접기"}
       <button data-t="gent">동네 변화<small>어디가 뜨고 밀려나나</small></button>
       <button data-t="trend">업계 동향<small>이 종목은 요즘 어떤가</small></button>
     </nav>
+    <button id="share" class="srcb" type="button" title="지금 보는 화면의 주소를 복사합니다">링크 복사</button>
   </div>
   <div class="ctl">
     <label>도시 <select id="reg"></select></label>
     <label class="c-region c-spot c-trend">창업 종목 <select id="upt"></select></label>
-    <label class="c-region">지도 색칠 <select id="metric"><option value="surv">3년 생존율</option><option value="now">영업 중 점포 수</option><option value="net">최근 3년 순증감</option><option value="open1">작년 개업 수</option><option value="close1">작년 폐업 수</option><option value="crate">작년 폐업률</option><option value="sale">점포당 월매출(2025)</option><option value="yoy">매출 증감(전년 대비)</option><option value="rent">소규모 상가 임대료</option><option value="pop">유동인구</option><option value="ppl">점포당 유동인구</option><option value="res">상주인구</option><option value="wrk">직장인구</option></select></label>
+    <label class="c-region">지도 색칠 <select id="metric"><option value="surv">3년 생존율</option><option value="now">영업 중 점포 수</option><option value="net">최근 3년 순증감</option><option value="open1">작년 개업 수</option><option value="close1">작년 폐업 수</option><option value="crate">작년 폐업률</option><option value="sale">점포당 월매출(2025)</option><option value="yoy">매출 증감(전년 대비)</option><option value="rent">소규모 상가 임대료</option><option value="burden">임대료 부담률</option><option value="pop">유동인구</option><option value="ppl">점포당 유동인구</option><option value="res">상주인구</option><option value="wrk">직장인구</option></select></label>
     <label class="c-region c-spot c-gent">자치구 <select id="gu"></select></label>
     <div class="search c-region c-spot"><input id="q" placeholder="주소로 바로 찾기 (예: 독막로3길 24-9)" autocomplete="off" aria-label="주소 또는 상호 검색"><div id="results"></div></div>
     <label class="c-spot">주변 반경 <select id="rad"><option>200</option><option selected>300</option><option>500</option></select>m</label>
@@ -204,6 +212,7 @@ details.fold[open]>summary::after{content:" 접기"}
 <script src="data/rent.js"></script>
 <script src="data/gent.js"></script>
 <script src="data/people.js"></script>
+<script src="data/succ.js"></script>
 <script>
 const S = window.SUM, NY = S.y1 - S.y0 + 1, $ = id => document.getElementById(id);
 const KSIC = {56111:'한식 일반',56112:'한식 면요리',56113:'한식 육류요리',56114:'한식 해산물요리',56121:'중식',56122:'일식',56123:'서양식',56129:'기타 외국식',56130:'구내식당',56141:'출장 음식',56142:'이동 음식',56191:'제과점',56192:'피자·햄버거·샌드위치',56193:'치킨',56194:'김밥·간이음식',56199:'간이음식 포장판매',56211:'일반 유흥주점',56212:'무도 유흥주점',56213:'생맥주 전문점',56219:'기타 주점',56221:'커피 전문점',56229:'기타 비알코올 음료점'};
@@ -258,9 +267,9 @@ const PP = window.POP, PQ = PP.q.length, qlab = q => `${q.slice(0, 4)}년 ${q[4]
 function popOf(d){ const e = PP.d[d]; if (!e) return null; const last = e[0][PQ-1], prev = e[0][PQ-5]; return {q:e[0], last, yoy: prev ? last/prev - 1 : null, g:e[1], a:e[2], t:e[3], d:e[4]}; }
 const popRank = {}; Object.keys(PP.d).sort((x, y) => PP.d[y][0][PQ-1] - PP.d[x][0][PQ-1]).forEach((d, i) => { popRank[d] = i + 1; });
 const MINN = 20;
-function metricOf(a, s, m, d){ if (m === 'res' || m === 'wrk'){ const e = PE.d[d], x = e && e[m === 'res' ? 0 : 1]; return x ? x[0] : null; } if (m === 'rent') return dongRent(d); if (m === 'open1') return a.op[NY-1]; if (m === 'close1') return a.cl[NY-1]; if (m === 'crate') return a.now + a.cl[NY-1] >= MINN ? a.cl[NY-1]/(a.now + a.cl[NY-1]) : null; if (m === 'pop' || m === 'ppl'){ const p = popOf(d); return !p ? null : m === 'pop' ? p.last : (a.now >= 5 ? p.last/a.now : null); } return m === 'now' ? a.now : m === 'surv' ? (a.n >= MINN ? a.rate : null) : m === 'net' ? a.net : m === 'yoy' ? (s ? s.yoy : null) : (s ? s.per : null); }
-const MLAB = {res:'상주인구', wrk:'직장인구', surv:'3년 생존율', now:'영업 중 점포 수', net:'최근 3년 순증감', sale:'점포당 월매출(2025)', yoy:'매출 증감(전년 대비)', pop:'분기 유동인구', ppl:'점포당 유동인구', rent:'소규모 상가 임대료(㎡당 월)', open1:`${S.y1}년 개업 수`, close1:`${S.y1}년 폐업 수`, crate:`${S.y1}년 폐업률`};
-const mfmt = (m, v) => v == null ? '–' : m === 'res' || m === 'wrk' ? num(v) + '명' : m === 'surv' ? pct(v) : m === 'sale' ? won(v) : m === 'net' ? sgn(v) : m === 'yoy' ? spct(v) : m === 'pop' || m === 'ppl' ? won(v) + '명' : m === 'rent' ? rfmt(v) : m === 'crate' ? (v*100).toFixed(1) + '%' : num(v);
+function metricOf(a, s, m, d){ if (m === 'burden'){ const r = dongRent(d); return r != null && s && s.per ? r*1000*33/s.per : null; } if (m === 'res' || m === 'wrk'){ const e = PE.d[d], x = e && e[m === 'res' ? 0 : 1]; return x ? x[0] : null; } if (m === 'rent') return dongRent(d); if (m === 'open1') return a.op[NY-1]; if (m === 'close1') return a.cl[NY-1]; if (m === 'crate') return a.now + a.cl[NY-1] >= MINN ? a.cl[NY-1]/(a.now + a.cl[NY-1]) : null; if (m === 'pop' || m === 'ppl'){ const p = popOf(d); return !p ? null : m === 'pop' ? p.last : (a.now >= 5 ? p.last/a.now : null); } return m === 'now' ? a.now : m === 'surv' ? (a.n >= MINN ? a.rate : null) : m === 'net' ? a.net : m === 'yoy' ? (s ? s.yoy : null) : (s ? s.per : null); }
+const MLAB = {burden:'임대료 부담률(33㎡ 가게)', res:'상주인구', wrk:'직장인구', surv:'3년 생존율', now:'영업 중 점포 수', net:'최근 3년 순증감', sale:'점포당 월매출(2025)', yoy:'매출 증감(전년 대비)', pop:'분기 유동인구', ppl:'점포당 유동인구', rent:'소규모 상가 임대료(㎡당 월)', open1:`${S.y1}년 개업 수`, close1:`${S.y1}년 폐업 수`, crate:`${S.y1}년 폐업률`};
+const mfmt = (m, v) => v == null ? '–' : m === 'burden' ? (v*100).toFixed(1) + '%' : m === 'res' || m === 'wrk' ? num(v) + '명' : m === 'surv' ? pct(v) : m === 'sale' ? won(v) : m === 'net' ? sgn(v) : m === 'yoy' ? spct(v) : m === 'pop' || m === 'ppl' ? won(v) + '명' : m === 'rent' ? rfmt(v) : m === 'crate' ? (v*100).toFixed(1) + '%' : num(v);
 
 // ---------- 지도 (포털 기본지도 "00. 바로e맵 Std")
 const BASEMAP = {id:'a177f5017b52486b930463f900da4d71', title:'00. 바로e맵 Std', baseMapLayers:[
@@ -324,7 +333,7 @@ function hoverDong(c, fromMap){ if (c === hovDong) return; const prev = hovDong;
 function quantiles(v, ps){ const a = v.slice().sort((x,y) => x-y); return ps.map(p => a[Math.min(a.length-1, Math.floor(p*a.length))]); }
 function cls(v){ let i = 0; while (i < breaks.length && v >= breaks[i]) i++; return i; }
 function paintDongs(){ const m = st.metric, vals = []; dongVal = {};
-  for (const d of DONGS){ const v = metricOf(agg([d], st.U), m === 'sale' || m === 'yoy' ? saleAgg([d], st.U) : null, m, d); dongVal[d] = v; if (v != null) vals.push(v); }
+  for (const d of DONGS){ const v = metricOf(agg([d], st.U), m === 'sale' || m === 'yoy' || m === 'burden' ? saleAgg([d], st.U) : null, m, d); dongVal[d] = v; if (v != null) vals.push(v); }
   if (m === 'net'){ const ab = vals.map(Math.abs).filter(x => x > 0), q = ab.length ? quantiles(ab, [.33,.75]) : [1,2]; const t1 = Math.max(1, q[0]), t2 = Math.max(t1+1, q[1]); breaks = [-t2+1, -t1+1, t1, t2]; }
   else if (m === 'yoy') breaks = [-.1, -.03, .03, .1];
   else breaks = vals.length ? [...new Set(quantiles(vals, [.2,.4,.6,.8]))] : [];
@@ -344,12 +353,21 @@ function setRegion(r){ st.reg = r; const gs = new Set(REG[r].gus);
   $('upt').innerHTML = '<option value="-1">음식점 전체</option>' + S.upt.map((u, i) => [u, i, uptTot[i].now]).filter(x => x[2] >= minN).sort((a, b) => b[2]-a[2]).map(x => `<option value="${x[1]}">${esc(x[0])}</option>`).join('');
   $('upt').value = keep; if ($('upt').value !== String(keep)){ st.U = -1; $('upt').value = '-1'; }
   $('gu').innerHTML = `<option value="">${esc(REG[r].name)} 전체</option>` + GUS.map(c => `<option value="${c}">${esc(S.gu[c])}</option>`).join('');
-  for (const o of $('metric').options) o.disabled = !hasSales && ['sale', 'yoy', 'pop', 'ppl', 'res', 'wrk'].includes(o.value);
+  for (const o of $('metric').options) o.disabled = !hasSales && ['sale', 'yoy', 'pop', 'ppl', 'res', 'wrk', 'burden'].includes(o.value);
   if ($('metric').selectedOptions[0].disabled){ st.metric = 'surv'; $('metric').value = 'surv'; } }
 const fitRegion = () => { if (view) view.goTo(dongLayer.graphics.filter(g => DSET.has(g.attributes.c)).toArray(), {duration:550, easing:'ease-in-out'}).catch(() => {}); };
 $('reg').innerHTML = S.reg.map(r => `<option value="${r[0]}">${esc(r[1])}</option>`).join('');
 $('reg').onchange = () => { st.gu = ''; st.dong = null; st.cur = -1; st.sort = null; setRegion($('reg').value); fitRegion(); render(); };
-setRegion('seoul');
+st.cmp = []; st.cmpOpen = false;
+function stateHash(){ const o = {t:st.tab, r:st.reg, u:st.U, m:st.metric, g:st.gu, d:st.dong || '', c:st.tab === 'spot' && st.cur >= 0 ? st.cur : '', s:st.gstage || '', x:st.cmp.join('.'), o:st.cmpOpen ? 1 : ''};
+  return '#' + Object.keys(o).filter(k => o[k] !== '' && o[k] != null).map(k => k + '=' + encodeURIComponent(o[k])).join('&'); }
+function applyHash(){ const q = {}; location.hash.slice(1).split('&').forEach(kv => { const i = kv.indexOf('='); if (i > 0) q[kv.slice(0, i)] = decodeURIComponent(kv.slice(i+1)); });
+  if (q.r && REG[q.r]) st.reg = q.r; if (['region', 'spot', 'gent', 'trend'].includes(q.t)) st.tab = q.t;
+  if (q.g && S.gu[q.g]) st.gu = q.g; if (q.d && S.dong[q.d]) st.dong = q.d; if (q.u != null && S.upt[+q.u]) st.U = +q.u; if (q.m && MLAB[q.m]) st.metric = q.m;
+  if (q.c != null && q.c !== '' && +q.c >= 0) st.cur = +q.c; if (['hot', 'rent', 'push', 'cold'].includes(q.s)) st.gstage = q.s; if (q.x) st.cmp = q.x.split('.').filter(d => S.dong[d]).slice(0, 4); st.cmpOpen = !!q.o && st.cmp.length > 0; }
+applyHash(); setRegion(st.reg); $('upt').value = st.U; if ($('upt').value !== String(st.U)){ st.U = -1; $('upt').value = '-1'; } $('metric').value = st.metric; if ($('metric').selectedOptions[0].disabled){ st.metric = 'surv'; $('metric').value = 'surv'; }
+$('share').onclick = () => { const b = $('share'), done = () => { b.textContent = '복사했습니다'; setTimeout(() => { b.textContent = '링크 복사'; }, 1600); }; history.replaceState(null, '', stateHash());
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(location.href).then(done, () => prompt('아래 주소를 복사하세요', location.href)); else prompt('아래 주소를 복사하세요', location.href); };
 $('upt').onchange = () => { st.U = +$('upt').value; st.K = null; render(); };
 $('metric').onchange = () => { st.metric = $('metric').value; st.sort = null; render(); };
 $('rad').onchange = () => render();
@@ -426,7 +444,7 @@ const kpiS = (l, s, extra) => kpi(l, pct(s.rate), (s.n ? s.n.toLocaleString() + 
 
 // ---------- 그리기
 let lastKey = '';
-function render(){ document.body.className = st.tab;
+function render(){ document.body.className = st.tab; try { history.replaceState(null, '', stateHash()); } catch (e) {}
   const key = [st.tab, st.dong, st.gu, st.cur, st.U].join('|'), P = $('panel');
   if (key !== lastKey){ lastKey = key; P.classList.remove('fresh'); void P.offsetWidth; P.classList.add('fresh');
     if (innerWidth <= 900 && (st.tab === 'spot' ? st.cur >= 0 : isDongTab(st.tab) && st.dong)) setTimeout(() => P.scrollIntoView({behavior:'smooth', block:'start'}), 80); }
@@ -480,6 +498,7 @@ function renderGent(){ paintGent(); const [p0, p1, r0, r1] = GT.yr;
     if (x){ const b = GT.avg[a.s][x.t];
       h += `<h3>임대료 · ${esc(a.n)} 상권</h3><button class="back" data-area="${g.area}" type="button">지도에서 이 상권 범위 보기</button><div class="kpis">${kpi('㎡당 월 임대료', rfmt(x.last), GTN[x.t] + ' 상가 1층')}${kpi('1년 상승률', spct(x.c1), `${a.s} 평균 ${spct(b.c1)} · 차이 ${ppf(x.x1)}`)}${kpi('3년 상승률', spct(x.c3), x.c3 == null ? '3년 전 조사값 없음' : `${a.s} 평균 ${spct(b.c3)} · 차이 ${ppf(x.x3)}`)}</div>${rentLine(a, x.t)}<div class="note">${g.rentUp ? `<b>급등 기준에 해당합니다.</b> ` : ''}기준: 1년 상승률이 ${a.s} 평균보다 ${GT.th.x1*100}%p 이상 높거나 3년 누적이 ${GT.th.x3*100}%p 이상 높을 때. 3년 상승률은 조사 표본이 바뀐 분기를 빼고 이어 붙였습니다.</div>`; }
     else h += `<h3>임대료</h3><div class="note" style="margin-top:0">이 동네를 넓게 덮는 한국부동산원 조사 상권이 없어 임대료 변화는 판단에 넣지 않았습니다.</div>`;
+    h += popBlock(d) + peopleBlock(d);
     h += `<p style="margin-top:22px"><button class="back" data-goregion type="button">이 동네의 생존율·매출 자세히 보기 →</button></p>` + src(GNOTE) + '</div>';
     $('panel').innerHTML = h; return; }
   const list = DONGS.filter(d => !st.gu || S.dong[d][1] === st.gu).map(d => [d, gd(d)]), cnt = {}; list.forEach(([, g]) => cnt[g.stage] = (cnt[g.stage] || 0) + 1);
@@ -496,16 +515,62 @@ function renderGent(){ paintGent(); const [p0, p1, r0, r1] = GT.yr;
   h += src(GNOTE, '단계를 나누는 기준') + '</div>'; $('panel').innerHTML = h; }
 const GNOTE = `<b>뜨는 중</b>: 개업 증가율, 유행 업종(카페·디저트·양식·이국 음식 등) 비중 변화, 유동인구 3년 변화, 추정매출 1년 변화의 도시 안 순위를 평균해 상위 25% 안에 드는 동네. <b>임대료 급등</b>: 동네 면적의 15% 이상을 덮는 조사 상권의 1년 임대료 상승률이 시도 평균보다 ${GT.th.x1*100}%p 이상 높거나 3년 누적이 ${GT.th.x3*100}%p 이상 높은 동네. <b>밀려나는 중</b>: 뜨는 중이거나 임대료 급등이면서, 폐업률 변화와 ${GT.old}년 넘은 가게의 폐업률이 도시 안 상위 25%인 동네. <b>식는 중</b>: 뜨는 신호가 하위 20%이고 개업이 줄어든 동네. 수원·화성의 매출은 경기도 카드매출 집계(경기데이터드림)를 썼고, 화성은 2025년과 2024년을 비교했습니다. 경기도 유동인구 집계는 동마다 변화 폭이 지나치게 커서 판단에 넣지 않았습니다. 신축 아파트 입주로 개업이 몰리거나 재개발·재건축 철거로 폐업이 몰린 동네도 같은 신호로 잡히므로, 단계는 현장을 확인할 곳을 고르는 용도로 보세요.`;
 
+// ===== 5. 덧붙인 분석: 승계 패턴, 임대료 부담률, 종목 순위, 비교
+const SC = window.SUCC || {}, rateBar = (label, k, n, note) => `<div class="pr"><span>${label}</span><span class="rank wide"><div style="width:${n ? Math.round(k/n*100) : 0}%"></div></span><b>${n ? pct(k/n) : '–'}</b><span class="sub">${n ? n.toLocaleString() + '곳' : ''}${note ? ' · ' + note : ''}</span></div>`;
+function priorBars(){ const p = (SC[st.reg] || {}).prior; if (!p) return ''; const d = p[2][1] && p[0][1] ? p[2][0]/p[2][1] - p[0][0]/p[0][1] : null;
+  return `<div class="prs">${rateBar('처음 닫은 적 없는 칸', p[0][0], p[0][1])}${rateBar('앞 가게 1곳이 닫은 칸', p[1][0], p[1][1])}${rateBar('앞 가게 2곳 이상 닫은 칸', p[2][0], p[2][1])}</div><div class="note">${esc(rName())}에서 호수까지 확인되는 칸만 모아, 직전 5년 안에 그 칸에서 닫은 가게 수에 따라 새로 들어온 가게의 3년 생존율을 나눠 본 것입니다.${d != null ? ` 두 번 넘게 바뀐 칸은 처음인 칸보다 ${Math.abs(d*100).toFixed(0)}%p ${d < 0 ? '낮습니다' : '높습니다'}.` : ''}</div>`; }
+function succBlock(U){ const e = SC[st.reg] && SC[st.reg].u[U]; if (!e) return '';
+  const sv = e.sv, tot = e.s || 1;
+  return `<div><h3>${esc(uName())}이(가) 나간 자리에 들어온 가게</h3><div class="note" style="margin-top:0">2010년 이후 폐업 ${e.n.toLocaleString()}건 중 ${e.s.toLocaleString()}건(${pct(e.s/e.n)})은 2년 안에 같은 층(호를 알면 같은 호)에 다른 음식점이 들어왔습니다.${U >= 0 ? ` 그중 ${pct(e.same/tot)}는 다시 ${esc(uName())}였습니다.` : ''}</div><table><thead><tr><th>뒤에 들어온 종목</th><th>건수</th><th>비중</th></tr></thead><tbody>`
+    + e.top.map(([u, c]) => `<tr data-u="${u}"${u === U ? ' class="pick"' : ''}><td>${esc(S.upt[u])}</td><td>${c.toLocaleString()}</td><td>${pct(c/tot)}</td></tr>`).join('') + `</tbody></table></div>`
+    + `<div><h3>앞 가게가 닫은 자리는 정말 안 좋은가</h3>${priorBars()}<div class="prs" style="margin-top:14px">${rateBar('같은 종목으로 들어온 가게', sv.same[0], sv.same[1])}${rateBar('다른 종목으로 들어온 가게', sv.diff[0], sv.diff[1])}</div><div class="note">${U >= 0 ? esc(uName()) + '이(가) ' : '가게가 '}나간 자리에 뒤이어 들어온 가게의 3년 생존율을, 앞 가게와 종목이 같은지에 따라 나눈 것입니다.</div></div>`; }
+function succSpot(recs){ const byf = {}; for (const r of recs) if (r[5] && r[3]) (byf[r[5]] = byf[r[5]] || []).push(r); const pairs = [];
+  for (const f in byf){ const rs = byf[f].slice().sort((x, y) => x[3]-y[3]), used = new Set();
+    for (const r of rs.slice().sort((x, y) => x[4]-y[4])){ if (r[4] <= 1 || r[4] < FROM) continue; const u = unitOf(r);
+      for (let j = 0; j < rs.length; j++){ const q = rs[j]; if (used.has(j) || q === r) continue; const gap = day(q[3]) - day(r[4]), uq = unitOf(q);
+        if (gap < -31 || gap > 730 || (u && uq && u !== uq) || (!u && !uq && rs.length > 6)) continue; used.add(j); pairs.push([r, q]); break; } } }
+  const c5 = recs.filter(r => r[4] > 1 && CUT - day(r[4]) <= 5*365).length;
+  let h = `<h3>앞 가게가 닫은 자리는 정말 안 좋은가</h3><div class="note" style="margin-top:0">지금 보고 있는 범위에서는 최근 5년 동안 음식점 ${c5}곳이 문을 닫았습니다. 아래는 ${esc(rName())} 전체에서 같은 칸의 앞 가게가 닫은 횟수에 따라 본 통계입니다.</div>${priorBars()}`;
+  if (pairs.length){ pairs.sort((x, y) => y[0][4]-x[0][4]);
+    h += `<h3>이 자리에서 바뀐 순서 (${pairs.length}번)</h3><table><thead><tr><th>층·호</th><th>나간 가게</th><th>들어온 가게</th><th>들어온 가게의 지금</th></tr></thead><tbody>` + pairs.slice(0, 8).map(([r, q]) => { const m = Math.round(((q[4] > 1 ? day(q[4]) : CUT) - day(q[3]))/30.4);
+      return `<tr style="cursor:default"><td>${floorLab(r[5])}${unitOf(q) || unitOf(r) ? ' ' + esc(unitOf(q) || unitOf(r)) : ''}</td><td>${esc(r[0])} <span class="sub">${esc(S.upt[r[2]])} · ${Math.floor(r[4]/10000)}년 폐업</span></td><td>${esc(q[0])} <span class="sub">${esc(S.upt[q[2]])}${q[2] === r[2] ? ' · 같은 종목' : ''}</span></td><td>${q[4] === 0 ? `<span style="color:var(--open);font-weight:600">영업 중</span> <span class="sub">${yrs(m)}째</span>` : q[4] === 1 ? '폐업일 미상' : `${yrs(m)} 만에 폐업`}</td></tr>`; }).join('') + `</tbody></table>${pairs.length > 8 ? `<div class="note">최근 8번만 보여 드립니다.</div>` : ''}`; }
+  return h; }
+const pplOf = d => { const e = PE.d[d]; return e && e[0] ? e[0][0] + (e[1] ? e[1][0] : 0) : null; };
+let burdenCache = {};
+function burdenNote(d, s){ const b = metricOf(null, s, 'burden', d); if (b == null) return ''; const key = st.reg + '|' + st.U;
+  if (!burdenCache[key]){ const v = DONGS.map(x => metricOf(null, saleAgg([x], st.U), 'burden', x)).filter(x => x != null).sort((x, y) => x-y); burdenCache[key] = v.length ? v[Math.floor(v.length/2)] : null; }
+  const med = burdenCache[key], rent = dongRent(d)*1000*33;
+  return `<div class="note" style="margin-top:10px;max-width:none"><b style="color:var(--ink)">임대료 부담률 ${(b*100).toFixed(1)}%</b> · 33㎡(10평) 1층 가게의 월 임대료 약 ${won(rent)}원을 이 동네 점포당 월매출 ${won(s.per)}원으로 나눈 값입니다.${med != null ? ` 임대료 자료가 있는 ${esc(rName())} 동네의 중앙값은 ${(med*100).toFixed(1)}%입니다.` : ''} 임대료는 상권 평균, 매출은 추정치라 대략의 수준으로만 보세요.</div>`; }
+function fitBlock(d){ const ppl = pplOf(d), regPpl = ppl != null ? DONGS.reduce((t, x) => t + (pplOf(x) || 0), 0) : 0, rows = [];
+  S.upt.forEach((nm, u) => { const a = agg([d], u), t = uptTot[u]; if (a.n < MINN || !t || t.n < MINN) return; rows.push({u, a, t, diff:a.rate - t.rate, den: ppl ? a.now/ppl*1e4 : null, rden: regPpl ? t.now/regPpl*1e4 : null}); });
+  if (rows.length < 2) return ''; rows.sort((x, y) => y.diff - x.diff);
+  return `<h3>이 동네에서 잘 버티는 종목 (행을 누르면 그 종목으로 바뀝니다)</h3><div class="scroll" style="max-height:330px"><table><thead><tr><th>종목</th><th>영업 중</th><th>3년 생존율</th><th>${esc(rName())} 평균</th><th>차이</th>${ppl ? '<th>인구 1만 명당 점포</th><th>도시 대비</th>' : ''}</tr></thead><tbody>`
+    + rows.map(r => `<tr data-u="${r.u}"${r.u === st.U ? ' class="pick"' : ''}><td>${esc(S.upt[r.u])}</td><td>${num(r.a.now)}</td><td>${pct(r.a.rate)}</td><td>${pct(r.t.rate)}</td><td>${ppf(r.diff)}</td>${ppl ? `<td>${r.den.toFixed(1)}</td><td>${r.rden ? (r.den/r.rden).toFixed(1) + '배' : '–'}</td>` : ''}</tr>`).join('')
+    + `</tbody></table></div><div class="note">표본이 ${MINN}곳 이상인 종목만 넣었습니다.${ppl ? ' 인구는 상주인구와 직장인구를 더한 값이고, 도시 대비가 1배를 크게 넘으면 그 종목이 이미 많은 동네입니다.' : ''}</div>`; }
+function cmpBar(){ if (!st.cmp.length) return ''; return `<div class="cmpbar"><span class="sub">비교함</span>${st.cmp.map(d => `<span class="chipx">${esc(S.dong[d][0])}<button data-cmp="${d}" type="button" aria-label="${esc(S.dong[d][0])} 빼기">×</button></span>`).join('')}<button class="btn" data-cmpopen="1" type="button"${st.cmp.length < 2 ? ' disabled title="두 곳 이상 담으면 비교할 수 있습니다"' : ''}>나란히 비교</button></div>`; }
+function renderCompare(){ const ds = st.cmp, U = st.U, A = ds.map(d => agg([d], U)), SA = ds.map(d => saleAgg([d], U)), best = (vals, hi) => { const v = vals.filter(x => x != null); if (v.length < 2) return null; return hi ? Math.max(...v) : Math.min(...v); };
+  const row = (label, vals, fmt, hi) => { const b = hi == null ? null : best(vals, hi); return `<tr style="cursor:default"><td>${label}</td>${vals.map(v => `<td${b != null && v === b ? ' class="bestc"' : ''}>${fmt(v)}</td>`).join('')}</tr>`; };
+  const P = ds.map(d => PE.d[d]), X = ds.map(d => { const g = gd(d); return g.area != null ? GT.areas[g.area].x : null; });
+  let h = `<div class="wrap"><button class="back" data-cmpopen="0" type="button">← 목록으로</button><h2>나란히 비교 · ${esc(uName())}</h2><div class="sub">칸에 밑줄이 있으면 그 항목에서 가장 유리한 동네입니다.</div><div style="overflow:auto"><table class="cmp"><thead><tr><th></th>${ds.map(d => `<th>${esc(S.dong[d][0])}<div class="sub">${esc(S.gu[S.dong[d][1]] || '')}</div></th>`).join('')}</tr></thead><tbody>`
+    + row('영업 중', A.map(a => a.now), v => num(v) + '곳') + row('3년 생존율', A.map(a => a.n >= MINN ? a.rate : null), pct, true) + row('최근 3년 순증감', A.map(a => a.net), sgn) + row(`${S.y1}년 폐업률`, ds.map((d, i) => metricOf(A[i], null, 'crate', d)), v => v == null ? '–' : (v*100).toFixed(1) + '%', false)
+    + row('점포당 월매출', SA.map(s => s ? s.per : null), v => v == null ? '–' : won(v) + '원', true) + row('매출 증감', SA.map(s => s ? s.yoy : null), spct, true)
+    + row('분기 유동인구', ds.map((d, i) => metricOf(A[i], null, 'pop', d)), v => v == null ? '–' : won(v) + '명', true) + row('상주인구', P.map(e => e && e[0] ? e[0][0] : null), v => v == null ? '–' : num(v) + '명') + row('직장인구', P.map(e => e && e[1] ? e[1][0] : null), v => v == null ? '–' : num(v) + '명')
+    + row('소규모 상가 임대료(㎡당 월)', ds.map(dongRent), rfmt, false) + row('임대료 1년 상승률', X.map(x => x ? x.c1 : null), spct, false) + row('임대료 부담률(33㎡)', ds.map((d, i) => metricOf(null, SA[i], 'burden', d)), v => v == null ? '–' : (v*100).toFixed(1) + '%', false)
+    + `<tr style="cursor:default"><td>동네 변화 단계</td>${ds.map(d => `<td>${chip(gd(d).stage)}</td>`).join('')}</tr><tr style="cursor:default"><td></td>${ds.map(d => `<td><button class="back" data-dong="${d}" type="button" style="margin:0">자세히 보기</button></td>`).join('')}</tr></tbody></table></div>`
+    + `<h3>나란히 본 연도별 개업·폐업</h3><div class="grid2">${ds.map((d, i) => `<div><div class="sub" style="font-weight:600;color:var(--ink)">${esc(S.dong[d][0])}</div>${yearly(A[i].op, A[i].cl)}</div>`).join('')}</div></div>`;
+  $('panel').innerHTML = h; }
+
 // ===== 1. 지역 찾기
 function renderRegion(){ paintDongs();
-  const m = st.metric, list = DONGS.filter(d => !st.gu || S.dong[d][1] === st.gu).map(d => { const a = agg([d], st.U), s = saleAgg([d], st.U); return {d, a, s, now:a.now, surv:a.n >= MINN ? a.rate : null, net:a.net, open1:a.op[NY-1], close1:a.cl[NY-1], crate:metricOf(a, null, 'crate', d), sale:s ? s.per : null, yoy:s ? s.yoy : null, pop:metricOf(a, null, 'pop', d), ppl:metricOf(a, null, 'ppl', d), rent:dongRent(d)}; });
+  const m = st.metric, list = DONGS.filter(d => !st.gu || S.dong[d][1] === st.gu).map(d => { const a = agg([d], st.U), s = saleAgg([d], st.U); return {d, a, s, now:a.now, surv:a.n >= MINN ? a.rate : null, net:a.net, open1:a.op[NY-1], close1:a.cl[NY-1], crate:metricOf(a, null, 'crate', d), sale:s ? s.per : null, yoy:s ? s.yoy : null, pop:metricOf(a, null, 'pop', d), ppl:metricOf(a, null, 'ppl', d), rent:dongRent(d), burden:metricOf(a, s, 'burden', d)}; });
   const key = st.sort || m; list.sort((x, y) => (y[key] == null ? -Infinity : y[key]) - (x[key] == null ? -Infinity : x[key]));
   const scope = st.gu ? S.gu[st.gu] : rName(), tot = agg(list.map(x => x.d), st.U);
-  let h = '<div class="wrap">';
+  if (st.cmpOpen && st.cmp.length) return renderCompare();
+  let h = '<div class="wrap">' + cmpBar();
   if (st.dong && S.st[st.dong]){ const di = S.dong[st.dong], a = agg([st.dong], st.U), s = saleAgg([st.dong], st.U), rank = list.findIndex(x => x.d === st.dong);
     h += `<h2>${esc(di[0])} <span class="sub">${esc(S.gu[di[1]] || '')}</span></h2><div class="sub">${esc(uName())}${rank >= 0 ? ` · ${MLAB[key]} 기준 ${scope} ${list.length}개 동 중 ${rank+1}위` : ''}</div>
       <div class="kpis" style="margin-top:10px">${kpi('영업 중', a.now.toLocaleString() + '곳', `최근 3년 ${sgn(a.net)}`)}${kpiS('3년 생존율', a, `${scope} ${pct(tot.rate)}`)}${kpi('점포당 월매출', s ? won(s.per) : '–', s ? `2025년 · 전년 대비 ${spct(s.yoy)}` : '이 종목은 매출 분류 없음')}</div>
-      ${yearly(a.op, a.cl)}${saleBlock(s, esc(catName(st.U)))}${popBlock(st.dong)}${peopleBlock(st.dong)}${RT.dong[st.dong] ? rentBlock(RT.dong[st.dong].slice(0, 4).map(x => [x[0], `동 면적의 ${Math.round(x[1]*100)}%`]), '임대료·공실률 · 이 동네에 걸친 상권') : rentBlock([], '임대료·공실률', '이 동네는 한국부동산원 조사 상권에 들어 있지 않아 지역 평균만 보여 드립니다.')}<div style="margin:12px 0 4px"><button class="btn pri" data-spot="${st.dong}">이 동네에서 자리 진단하기</button></div>`;
+      ${burdenNote(st.dong, s)}<div style="margin:10px 0 0"><button class="btn" data-cmp="${st.dong}" type="button">${st.cmp.includes(st.dong) ? '비교에서 빼기' : '비교에 담기'}</button></div>${yearly(a.op, a.cl)}${saleBlock(s, esc(catName(st.U)))}${popBlock(st.dong)}${peopleBlock(st.dong)}${fitBlock(st.dong)}${RT.dong[st.dong] ? rentBlock(RT.dong[st.dong].slice(0, 4).map(x => [x[0], `동 면적의 ${Math.round(x[1]*100)}%`]), '임대료·공실률 · 이 동네에 걸친 상권') : rentBlock([], '임대료·공실률', '이 동네는 한국부동산원 조사 상권에 들어 있지 않아 지역 평균만 보여 드립니다.')}<div style="margin:12px 0 4px"><button class="btn pri" data-spot="${st.dong}">이 동네에서 자리 진단하기</button></div>`;
     if (a.n < MINN) h += `<div class="note">이 동네는 해당 종목의 표본(${a.n}곳)이 적어 생존율이 크게 흔들립니다.</div>`;
   } else h += `<h2>${esc(scope)} · ${esc(uName())}</h2><div class="sub">지도에서 동네를 누르거나 아래 표에서 고르세요.</div>
       <div class="kpis" style="margin-top:10px">${kpi('영업 중', tot.now.toLocaleString() + '곳', `최근 3년 ${sgn(tot.net)}`)}${kpiS('3년 생존율', tot)}${kpi('행정동', list.length + '곳', '')}</div>`;
@@ -581,10 +646,10 @@ function renderSpot(){ if (!st.gu){ setLegend('주소를 검색하거나 지도�
     h += `<div class="note" style="margin:0 0 8px">호 단위는 기록이 적어 판정이 ‘보류’로 나오기 쉽습니다. 주소에 호가 적히지 않은 기록은 ‘호 미상’으로 묶입니다.</div>`; }
   h += `<div class="verdict ${v[0]}"><span class="stamp">${{warn:'주의', hold:'보류', ok:'양호'}[v[0]]}</span><div><b>${v[1]}</b><p>${v[2]}</p></div></div><div class="kpis">${kpi('2010년 이후 개업', recent.length + '곳', `현재 영업 ${openNow}곳${pops ? ' · 단기 ' + pops + '건 제외' : ''}`)}${kpiS('이 자리 3년 생존율', sS)}${kpiS(`주변 ${R}m 3년 생존율`, sN)}</div>`;
   h += `<div class="note">${esc(S.gu[st.gu])} 전체 음식점 3년 생존율은 ${pct(sA.rate)}입니다 (${sA.n.toLocaleString()}곳).</div>`;
-  h += '<h3>이 자리의 이력 (2010년 이후)</h3>' + timeline(spot);
+  h += '<h3>이 자리의 이력 (2010년 이후)</h3>' + timeline(spot) + succSpot(spot);
   h += `<h3>주변 ${R}m · ${esc(uName())}</h3><div class="kpis">${kpi('현재 영업 중 (경쟁점)', compet + '곳', `건물 ${nearB.length}곳 안`)}${kpiS('3년 생존율', sNU, dA && dA.n >= MINN ? `동 전체 ${pct(dA.rate)}` : '')}${kpi('영업기간 중앙값', yrs(kmN), `${rName()} ${yrs(seoulKm)}`)}</div>`;
   const op = new Array(NY).fill(0), cl = new Array(NY).fill(0); for (const r of nearU){ if (isPopup(r)) continue; const a = Math.floor(r[3]/10000) - S.y0, z = Math.floor(r[4]/10000) - S.y0; if (a >= 0 && a < NY) op[a]++; if (r[4] > 1 && z >= 0 && z < NY) cl[z]++; }
-  h += yearly(op, cl) + spotRent(b) + dongSales(b[5], U) + (b[5] ? popBlock(b[5]) : '') + spotSales(G, b, U, R) + (others.length ? `<div class="note">구 경계 근처라 ${others.map(g => esc(S.gu[g])).join('·')}의 가게도 주변 비교에 포함했습니다${waiting.length ? ' (이웃 구 자료를 불러오는 중이라 잠시 뒤 수치가 바뀝니다)' : ''}. 2021년 블록 단위 매출만은 선택한 구 안의 구역으로 계산합니다.</div>` : '') + '</div>';
+  h += yearly(op, cl) + spotRent(b) + dongSales(b[5], U) + (b[5] ? popBlock(b[5]) + peopleBlock(b[5]) : '') + spotSales(G, b, U, R) + (others.length ? `<div class="note">구 경계 근처라 ${others.map(g => esc(S.gu[g])).join('·')}의 가게도 주변 비교에 포함했습니다${waiting.length ? ' (이웃 구 자료를 불러오는 중이라 잠시 뒤 수치가 바뀝니다)' : ''}. 2021년 블록 단위 매출만은 선택한 구 안의 구역으로 계산합니다.</div>` : '') + '</div>';
   $('panel').innerHTML = h; }
 // 주소 상세(r[6])에서 호를 뽑는다. 범위·나열은 첫 번째 호, 없으면 ''(호 미상)
 const UNIT_RE = /(?:(?:^|[\s,])([A-Za-z가-힣]|\d{1,3})동\s*)?(B|비|지하)?\s*(\d{1,4})(?:\s*[-~,·.]\s*(?:B|비)?\d{1,4})*\s*호/i, unitCache = new WeakMap();
@@ -641,6 +706,7 @@ function renderTrend(){ const U = st.U, a = agg(DONGS, U), all = agg(DONGS, -1),
   h += `<div><h3>연도별 개업·폐업</h3>${yearly(a.op, a.cl, 540)}</div>`;
   h += `<div><h3>개업 연도별 3년 생존율 (그해 문 연 가게가 3년 뒤에도 영업한 비율)</h3>${se[1].length ? cohort(se[1], U >= 0 && KMR()[-1] ? KMR()[-1][1] : null) : '<div class="sub">자료 없음</div>'}</div>`;
   const rows = S.upt.map((u, i) => ({i, u, a:uptTot[i], km:KMR()[i] ? KMR()[i][0] : null})).filter(x => x.a.now >= (st.reg === 'seoul' ? 200 : 30)).sort((x, y) => y.a.now - x.a.now);
+  h += succBlock(U);
   h += `<div><h3>종목별 비교 (행을 누르면 그 종목으로 바뀝니다)</h3><div class="scroll"><table><thead><tr><th>종목</th><th>영업 중</th><th>${S.y1} 개업</th><th>${S.y1} 폐업</th><th>3년 순증감</th><th>3년 생존율</th><th>영업기간</th></tr></thead><tbody>`
     + rows.map(x => `<tr data-u="${x.i}" class="${x.i === U ? 'pick' : ''}"><td>${esc(x.u)}</td><td>${num(x.a.now)}</td><td>${num(x.a.op[L1])}</td><td>${num(x.a.cl[L1])}</td><td>${sgn(x.a.net)}</td><td>${pct(x.a.rate)}</td><td>${yrs(x.km)}</td></tr>`).join('') + '</tbody></table></div>'
     + src('종목은 인허가 대장의 ‘업태’ 분류입니다. 신고할 때 고른 값이라 ‘기타’가 많고, 실제 메뉴와 다를 수 있습니다.') + '</div>';
@@ -667,7 +733,7 @@ const SRCS = {
   people: ['상주인구·직장인구', ['서울시 상권분석서비스 ‘상주인구-행정동’, ‘직장인구-행정동’ (서울 열린데이터광장)', `${PE.q[0] ? PE.q[0].slice(0, 4) + '년 ' + PE.q[0][4] + '분기' : ''} 기준`, '주민등록과 사업체 자료를 바탕으로 한 추정치입니다', '서울만 있습니다 (수원·화성 없음)']],
   gg: ['경기도 카드매출', ['경기데이터드림 ‘카드매출 행정동 집계’의 외식 업종 합계', '수원은 2026년 8월까지, 화성은 2025년 12월까지 있습니다', '동네 변화 탭의 매출 변화율 계산에만 썼습니다']],
   bc: ['(예시) 블록 단위 카드매출', ['2021년 블록 단위 카드매출 표본', '일부 카드사 결제분만 담은 표본이라 지금의 실제 매출을 나타내지 않습니다']] };
-const srcKeys = t => /단계|신호/.test(t) ? (st.reg === 'seoul' ? ['permit', 'pop', 'sales', 'rent'] : ['permit', 'gg', 'rent']) : /카드매출/.test(t) ? ['bc'] : /동네 순위/.test(t) ? ['permit', 'sales', 'pop', 'rent'] : /자치구별/.test(t) ? ['permit', 'sales'] : /배후 인구|상주|직장인구/.test(t) ? ['people'] : /점포당 유동인구/.test(t) ? ['pop', 'permit'] : /임대료|공실/.test(t) ? ['rent'] : /유동인구/.test(t) ? ['pop'] : /매출/.test(t) ? ['sales'] : ['permit'];
+const srcKeys = t => /잘 버티는|나란히/.test(t) ? (st.reg === 'seoul' ? ['permit', 'people', 'sales', 'rent'] : ['permit', 'rent']) : /단계|신호/.test(t) ? (st.reg === 'seoul' ? ['permit', 'pop', 'sales', 'rent'] : ['permit', 'gg', 'rent']) : /카드매출/.test(t) ? ['bc'] : /동네 순위/.test(t) ? ['permit', 'sales', 'pop', 'rent'] : /자치구별/.test(t) ? ['permit', 'sales'] : /배후 인구|상주|직장인구/.test(t) ? ['people'] : /점포당 유동인구/.test(t) ? ['pop', 'permit'] : /임대료|공실/.test(t) ? ['rent'] : /유동인구/.test(t) ? ['pop'] : /매출/.test(t) ? ['sales'] : ['permit'];
 const srcBox = keys => `<div class="srcbox">${keys.map(k => `<b>${SRCS[k][0]}</b><ul>${SRCS[k][1].map(x => `<li>${x}</li>`).join('')}</ul>`).join('')}</div>`;
 function addSrcButtons(){ for (const el of $('panel').querySelectorAll('h3, details.fold>summary, .kpi .l')){ if (el.querySelector('.srcb')) continue;
     const k = srcKeys(el.textContent), kp = el.classList.contains('l'), b = document.createElement('button'); b.type = 'button'; b.className = 'srcb' + (kp ? ' mini' : ''); b.dataset.src = k.join(','); b.textContent = kp ? 'i' : '출처'; b.title = '어디서 가져온 자료인지 보기'; b.setAttribute('aria-label', '자료 출처 보기'); el.classList.add('hsrc'); el.appendChild(b); }
@@ -679,12 +745,14 @@ $('panel').addEventListener('click', e => { const b = e.target.closest('.srcb');
   if (on || !host) return; b.classList.add('on'); b.setAttribute('aria-expanded', 'true'); host.insertAdjacentHTML('afterend', srcBox(b.dataset.src.split(','))); }, true);
 $('panel').addEventListener('click', e => { let t;
   if ((t = e.target.closest('[data-sort]'))){ st.sort = t.dataset.sort; return render(); }
+  if ((t = e.target.closest('[data-cmp]'))){ const d = t.dataset.cmp, i = st.cmp.indexOf(d); if (i >= 0) st.cmp.splice(i, 1); else if (st.cmp.length < 4) st.cmp.push(d); else return void alert('비교는 4곳까지 담을 수 있습니다.'); if (!st.cmp.length) st.cmpOpen = false; const y = $('panel').scrollTop; render(); $('panel').scrollTop = y; return; }
+  if ((t = e.target.closest('[data-cmpopen]'))){ st.cmpOpen = t.dataset.cmpopen === '1'; render(); if (st.cmpOpen) zoomDongs(st.cmp); $('panel').scrollTop = 0; return; }
   if ((t = e.target.closest('[data-gstage]'))){ st.gstage = st.gstage === t.dataset.gstage ? '' : t.dataset.gstage; st.garea = null; render(); if (st.gstage) zoomDongs(DONGS.filter(d => gd(d).stage === st.gstage && (!st.gu || S.dong[d][1] === st.gu))); else fitRegion(); return; }
   if ((t = e.target.closest('[data-area]'))){ const i = +t.dataset.area, y = $('panel').scrollTop; st.garea = st.garea === i ? null : i; render(); $('panel').scrollTop = y; if (st.garea != null) focusArea(i, true); return; }
   if ((t = e.target.closest('[data-gback]'))){ st.dong = null; render(); fitRegion(); return; }
   if ((t = e.target.closest('[data-goregion]'))){ st.tab = 'region'; return render(); }
   if ((t = e.target.closest('[data-spot]'))){ const d = S.dong[t.dataset.spot]; st.gu = d[1]; $('gu').value = d[1]; st.cur = -1; st.tab = 'spot'; render(); flyTo(d[2], d[3], 16); return; }
-  if ((t = e.target.closest('[data-dong]'))){ st.dong = t.dataset.dong; st.garea = null; const d = S.dong[st.dong]; if (view){ if (st.tab === 'gent' && dongG[st.dong]) zoomDongs([st.dong]); else flyTo(d[2], d[3], Math.max(Math.round(view.zoom), 13)); } render(); $('panel').scrollTop = 0; return; }
+  if ((t = e.target.closest('[data-dong]'))){ st.dong = t.dataset.dong; st.garea = null; st.cmpOpen = false; const d = S.dong[st.dong]; if (view){ if (st.tab === 'gent' && dongG[st.dong]) zoomDongs([st.dong]); else flyTo(d[2], d[3], Math.max(Math.round(view.zoom), 13)); } render(); $('panel').scrollTop = 0; return; }
   if ((t = e.target.closest('[data-u]'))){ st.U = +t.dataset.u; $('upt').value = st.U; if ($('upt').value !== String(st.U)) $('upt').value = '-1'; return render(); }
   if ((t = e.target.closest('[data-gu]'))){ st.gu = t.dataset.gu; $('gu').value = st.gu; st.dong = null; st.tab = 'region'; $('gu').onchange(); return; }
   if ((t = e.target.closest('[data-f]'))){ st.floor = t.dataset.f; st.unit = '*'; return render(); }
