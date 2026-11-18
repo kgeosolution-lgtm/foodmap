@@ -164,6 +164,9 @@ tr[data-area]{cursor:pointer}tr.apick td{box-shadow:inset 0 -2px #e0412b}
 .cmpbar .btn{margin-left:auto}.btn:disabled{opacity:.5;cursor:default}
 table.cmp td,table.cmp th{text-align:right}table.cmp td:first-child,table.cmp th:first-child{text-align:left;color:var(--sub)}td.bestc{font-weight:600;box-shadow:inset 0 -2px var(--accent)}
 #share{margin-left:auto;align-self:center}
+#bmsw{position:absolute;right:10px;bottom:10px;z-index:4;display:flex;background:var(--card);border:1px solid var(--line);border-radius:6px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.18)}
+#bmsw button{font:inherit;font-size:12.5px;padding:6px 12px;border:0;background:none;color:var(--ink);cursor:pointer}#bmsw button.on{background:var(--ink);color:var(--card);font-weight:600}#bmsw button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+body.trend #bmsw{display:none}
 details.src{margin-top:10px;font-size:12.5px;color:var(--sub)}
 details.src>summary{cursor:pointer;display:inline-block;text-decoration:underline dotted;text-underline-offset:3px}
 details.src>summary::-webkit-details-marker{display:none}
@@ -201,7 +204,7 @@ details.fold[open]>summary::after{content:" 접기"}
   </div>
 </header>
 <main>
-  <div id="mapwrap"><div id="map"></div><div id="legend" class="maplegend"></div><div id="tip"></div><div id="busy">지도를 불러오는 중</div><div id="hint"></div></div>
+  <div id="mapwrap"><div id="map"></div><div id="legend" class="maplegend"></div><div id="tip"></div><div id="busy">지도를 불러오는 중</div><div id="bmsw" role="group" aria-label="배경지도"><button type="button" data-bm="std" class="on" aria-pressed="true">지도</button><button type="button" data-bm="sat" aria-pressed="false">위성</button></div><div id="hint"></div></div>
   <div id="panel"></div>
 </main>
 <script src="https://js.arcgis.com/4.33/"></script>
@@ -274,6 +277,11 @@ const MLAB = {burden:'임대료 부담률(33㎡ 가게)', res:'상주인구', wr
 const mfmt = (m, v) => v == null ? '–' : m === 'burden' ? (v*100).toFixed(1) + '%' : m === 'res' || m === 'wrk' ? num(v) + '명' : m === 'surv' ? pct(v) : m === 'sale' ? won(v) : m === 'net' ? sgn(v) : m === 'yoy' ? spct(v) : m === 'pop' || m === 'ppl' ? won(v) + '명' : m === 'rent' ? rfmt(v) : m === 'crate' ? (v*100).toFixed(1) + '%' : num(v);
 
 // ---------- 지도 (포털 기본지도 "00. 바로e맵 Std")
+// 위성 = 포털 웹 지도 '22. VworldImagery(이미지타일)' (d6e738240ab2402095b4bb11c28ef320)
+const SATMAP = {id:'d6e738240ab2402095b4bb11c28ef320', title:'위성영상', baseMapLayers:[
+  {id:'World_Imagery', title:'World Imagery', url:'https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer', layerType:'ArcGISTiledMapServiceLayer', maxScale:25000000},
+  {id:'VworldSatellite', title:'VworldSatellite', layerType:'WebTiledLayer', copyright:'VWORLD', templateUrl:'https://cdn.vworld.kr/2d/Satellite/service/{level}/{col}/{row}.jpeg'}]};
+let BMS = null, bmNow = 'std';
 const BASEMAP = {id:'a177f5017b52486b930463f900da4d71', title:'00. 바로e맵 Std', baseMapLayers:[
   {id:'World_Hillshade_3805', opacity:.5, title:'음영기복', url:'https://services.arcgisonline.com/arcgis/rest/services/Elevation/World_Hillshade/MapServer', visibility:true, layerType:'ArcGISTiledMapServiceLayer', maxScale:0, blendMode:'normal'},
   {id:'VectorTile_2333', opacity:1, title:'지형도', visibility:true, layerType:'VectorTileLayer', minScale:0, maxScale:3000000, styleUrl:'https://cdn.arcgis.com/sharing/rest/content/items/d9b6f47909c74f1fb5c7cefd14470e68/resources/styles/root.json'},
@@ -302,8 +310,11 @@ function initMap(){
     const gc = {}; for (const d of Object.keys(S.dong)){ const x = S.dong[d], e = gc[x[1]] || (gc[x[1]] = [0, 0, 0]); e[0] += x[2]; e[1] += x[3]; e[2]++; }
     const guLab = labLayer(Object.keys(gc).filter(g => S.gu[g]).map(g => [gc[g][0]/gc[g][2], gc[g][1]/gc[g][2], S.gu[g]]), 12, 'bold', 0, 100000);
     const dongLab = labLayer(Object.keys(S.dong).map(d => [S.dong[d][2], S.dong[d][3], S.dong[d][0]]), 9.5, 'normal', 100000, 0);
-    view = new MapView({container:'map', map:new Map({basemap:Basemap.fromJSON(BASEMAP), layers:[dongLayer, rentLayer, guLab, dongLab, spotLayer, selLayer]}), center:[126.99, 37.55], zoom:11, popupEnabled:false, constraints:{snapToZoom:true}});
+    view = new MapView({container:'map', map:new Map({basemap:(BMS = {std:Basemap.fromJSON(BASEMAP), sat:Basemap.fromJSON(SATMAP)}).std, layers:[dongLayer, rentLayer, guLab, dongLab, spotLayer, selLayer]}), center:[126.99, 37.55], zoom:11, popupEnabled:false, constraints:{snapToZoom:true}});
     dongLayer.graphics.forEach(g => { dongG[g.attributes.c] = g; });
+    view.ui.components = ['zoom'];
+    $('bmsw').onclick = e => { const b = e.target.closest('[data-bm]'); if (!b || b.dataset.bm === bmNow) return; bmNow = b.dataset.bm; view.map.basemap = BMS[bmNow]; document.querySelectorAll('#bmsw button').forEach(x => { const on = x.dataset.bm === bmNow; x.classList.toggle('on', on); x.setAttribute('aria-pressed', on); }); };
+    view.watch('stationary', s => { if (s) loadGusInView(); });
     view.on('click', e => { const tab = st.tab, layer = isDongTab(tab) ? dongLayer : spotLayer;
       view.hitTest(e, {include:[layer]}).then(r => { const g = r.results.length && r.results[0].graphic; if (st.tab !== tab) return;
         if (isDongTab(tab)){ if (g){ st.dong = g.attributes.c; render(); view.goTo(g.geometry.extent.clone().expand(3.2), {duration:550, easing:'ease-in-out'}).catch(() => {}); } return; }
@@ -526,6 +537,8 @@ function succBlock(U){ const e = SC[st.reg] && SC[st.reg].u[U]; if (!e) return '
   return `<div><h3>${esc(uName())}이(가) 나간 자리에 들어온 가게</h3><div class="note" style="margin-top:0">2010년 이후 폐업 ${e.n.toLocaleString()}건 중 ${e.s.toLocaleString()}건(${pct(e.s/e.n)})은 2년 안에 같은 층(호를 알면 같은 호)에 다른 음식점이 들어왔습니다.${U >= 0 ? ` 그중 ${pct(e.same/tot)}는 다시 ${esc(uName())}였습니다.` : ''}</div><table><thead><tr><th>뒤에 들어온 종목</th><th>건수</th><th>비중</th></tr></thead><tbody>`
     + e.top.map(([u, c]) => `<tr data-u="${u}"${u === U ? ' class="pick"' : ''}><td>${esc(S.upt[u])}</td><td>${c.toLocaleString()}</td><td>${pct(c/tot)}</td></tr>`).join('') + `</tbody></table></div>`
     + `<div><h3>앞 가게가 닫은 자리는 정말 안 좋은가</h3>${priorBars()}<div class="prs" style="margin-top:14px">${rateBar('같은 종목으로 들어온 가게', sv.same[0], sv.same[1])}${rateBar('다른 종목으로 들어온 가게', sv.diff[0], sv.diff[1])}</div><div class="note">${U >= 0 ? esc(uName()) + '이(가) ' : '가게가 '}나간 자리에 뒤이어 들어온 가게의 3년 생존율을, 앞 가게와 종목이 같은지에 따라 나눈 것입니다.</div></div>`; }
+function oldClosed(recs){ const o = recs.filter(r => r[4] > 1 && r[4] < FROM).sort((x, y) => y[4]-x[4]), u = recs.filter(r => r[4] === 1); if (!o.length && !u.length) return '';
+  return `<details class="src"><summary>2010년 이전에 닫았거나 폐업일을 모르는 가게 ${o.length + u.length}곳</summary><table style="margin-top:6px"><tbody>` + o.concat(u).map(r => `<tr style="cursor:default"><td>${esc(r[0])}</td><td><span class="sub">${esc(S.upt[r[2]] || '')}</span></td><td>${r[3] ? Math.floor(r[3]/10000) : '?'} ~ ${r[4] === 1 ? '폐업일 미상' : Math.floor(r[4]/10000)}</td></tr>`).join('') + '</tbody></table></details>'; }
 function succSpot(recs){ const byf = {}; for (const r of recs) if (r[5] && r[3]) (byf[r[5]] = byf[r[5]] || []).push(r); const pairs = [];
   for (const f in byf){ const rs = byf[f].slice().sort((x, y) => x[3]-y[3]), used = new Set();
     for (const r of rs.slice().sort((x, y) => x[4]-y[4])){ if (r[4] <= 1 || r[4] < FROM) continue; const u = unitOf(r);
@@ -619,6 +632,9 @@ function drawGu(g){ if (!view || drawn.has(g) || !GU[g]) return;
   if (drawn.size >= 5){ spotLayer.removeAll(); drawn.clear(); if (g !== st.gu) drawGu(st.gu); }
   drawn.add(g); spotLayer.addMany(GU[g].b.map((b, i) => { const n = b[4].filter(r => r[3] >= 20150101 && !isPopup(r)).length;
     return new Graphic({geometry:{type:'point', longitude:b[2], latitude:b[1]}, attributes:{g, i}, symbol:{type:'simple-marker', size:8, color:RAMP[lvl(n)], outline:{color:[255,255,255,.9], width:.6}}}); })); }
+function loadGusInView(){ if (!view || st.tab !== 'spot' || view.zoom < 12 || !view.extent) return; const e = view.extent, seen = new Set(), R = 20037508.34;
+  for (const fx of [.5, .15, .85]) for (const fy of [.5, .15, .85]){ const x = e.xmin + (e.xmax-e.xmin)*fx, y = e.ymin + (e.ymax-e.ymin)*fy, g = guAt(x/R*180, Math.atan(Math.exp(y/R*Math.PI))*360/Math.PI - 90);
+    if (!g || seen.has(g) || seen.size >= 4) continue; seen.add(g); if (!drawn.has(g)) needGu(g, () => { if (st.tab === 'spot') drawGu(g); }); } }
 function drawSpotLayer(){ drawGu(st.gu);
   setLegend('<b>2015년 이후 음식점 개업</b><br>' + ['0건','1–2건','3–5건','6–10건','11건 이상'].map((t, i) => `<i style="border-radius:50%;background:${RAMP[i]}"></i>${t}`).join('<br>')); }
 function pickSpot(g, i, fly){ st.tab = 'spot'; if (g !== st.gu){ st.gu = g; $('gu').value = g; } st.cur = i; st.floor = '*'; st.unit = '*'; st.K = null; const ready = !!GU[g];
@@ -671,7 +687,7 @@ function renderSpot(){ if (!st.gu){ setLegend('주소를 검색하거나 지도�
     h += `<div class="note" style="margin:0 0 8px">호 단위는 기록이 적어 판정이 ‘보류’로 나오기 쉽습니다. 주소에 호가 적히지 않은 기록은 ‘호 미상’으로 묶입니다.</div>`; }
   h += `<div class="verdict ${v[0]}"><span class="stamp">${{warn:'주의', hold:'보류', ok:'양호'}[v[0]]}</span><div><b>${v[1]}</b><p>${v[2]}</p></div></div><div class="kpis">${kpi('2010년 이후 개업', recent.length + '곳', `현재 영업 ${openNow}곳${pops ? ' · 단기 ' + pops + '건 제외' : ''}`)}${kpiS('이 자리 3년 생존율', sS)}${kpiS(`주변 ${R}m 3년 생존율`, sN)}</div>`;
   h += `<div class="note">${esc(S.gu[st.gu])} 전체 음식점 3년 생존율은 ${pct(sA.rate)}입니다 (${sA.n.toLocaleString()}곳).</div>`;
-  h += '<h3>이 자리의 이력 (2010년 이후)</h3>' + timeline(spot) + succSpot(spot) + bldBlock(b) + subwayBlock(b[1], b[2], 1500, '가까운 지하철역');
+  h += '<h3>이 자리의 이력 (2010년 이후)</h3>' + timeline(spot) + oldClosed(spot) + succSpot(spot) + bldBlock(b) + subwayBlock(b[1], b[2], 1500, '가까운 지하철역');
   h += `<h3>주변 ${R}m · ${esc(uName())}</h3><div class="kpis">${kpi('현재 영업 중 (경쟁점)', compet + '곳', `건물 ${nearB.length}곳 안`)}${kpiS('3년 생존율', sNU, dA && dA.n >= MINN ? `동 전체 ${pct(dA.rate)}` : '')}${kpi('영업기간 중앙값', yrs(kmN), `${rName()} ${yrs(seoulKm)}`)}</div>`;
   const op = new Array(NY).fill(0), cl = new Array(NY).fill(0); for (const r of nearU){ if (isPopup(r)) continue; const a = Math.floor(r[3]/10000) - S.y0, z = Math.floor(r[4]/10000) - S.y0; if (a >= 0 && a < NY) op[a]++; if (r[4] > 1 && z >= 0 && z < NY) cl[z]++; }
   h += yearly(op, cl) + spotRent(b) + dongSales(b[5], U) + (b[5] ? popBlock(b[5]) + peopleBlock(b[5]) : '') + spotSales(G, b, U, R) + (others.length ? `<div class="note">구 경계 근처라 ${others.map(g => esc(S.gu[g])).join('·')}의 가게도 주변 비교에 포함했습니다${waiting.length ? ' (이웃 구 자료를 불러오는 중이라 잠시 뒤 수치가 바뀝니다)' : ''}. 2021년 블록 단위 매출만은 선택한 구 안의 구역으로 계산합니다.</div>` : '') + '</div>';
@@ -795,7 +811,9 @@ $('q').addEventListener('input', () => { const box = $('results'), raw = $('q').
     for (let i = 0; i < a.length && out.length < 40; i++) if (a[i].includes(qn)){ out.push([g, i, '', a[i].endsWith(qn) ? 0 : 1]); seen.add(g + ':' + i); }
     if (out.length >= 40) break; }
   out.sort((x, y) => x[3] - y[3]);
-  if (G) for (let i = 0; i < G.b.length && out.length < 55; i++) if (!seen.has(st.gu + ':' + i) && G.idx[i].includes(q)) out.push([st.gu, i, G.b[i][4].filter(r => r[0].toLowerCase().includes(q)).slice(-2).map(r => r[0]).join(', ')]);
+  // 상호 검색: 수원·화성은 구가 적어 도시 전체를 불러와 찾고, 서울은 이미 불러온 구에서 찾는다
+  if (st.reg !== 'seoul') GUS.forEach(g => { if (!GU[g]) needGu(g, () => { if ($('q').value.trim().toLowerCase() === raw) $('q').dispatchEvent(new Event('input')); }); });
+  for (const g of [st.gu, ...GUS.filter(x => x !== st.gu)]){ const Gx = GU[g]; if (!Gx || !Gx.idx) continue; for (let i = 0; i < Gx.b.length && out.length < 60; i++) if (!seen.has(g + ':' + i) && Gx.idx[i].includes(q)) out.push([g, i, Gx.b[i][4].filter(r => r[0].toLowerCase().includes(q)).slice(-2).map(r => r[0] + (r[4] > 1 ? ' (폐업)' : '')).join(', ')]); }
   box.innerHTML = out.map(([g, i, m]) => `<div data-g="${g}" data-i="${i}">${esc(S.gu[g])} ${esc(A ? ADDR[g][i] : GU[g].b[i][0])}${m ? `<small>${esc(m)}</small>` : ''}</div>`).join('') || `<div>${A ? '결과 없음' : '주소 목록을 불러오는 중입니다. 잠시 뒤 다시 입력해 주세요.'}</div>`;
   box.style.display = 'block'; });
 $('panel').addEventListener('mouseover', e => { if (!isDongTab(st.tab) || !view) return; const t = e.target.closest('tr[data-dong]'); hoverDong(t ? t.dataset.dong : null, false); });
