@@ -226,6 +226,7 @@ details.fold[open]>summary::after{content:" 접기"}
 <script src="data/pop.js"></script>
 <script src="data/rent.js"></script>
 <script src="data/gent.js"></script>
+<script src="data/gentf.js"></script>
 <script src="data/people.js"></script>
 <script src="data/succ.js"></script>
 <script src="data/chain.js"></script>
@@ -302,13 +303,13 @@ const BASEMAP = {id:'a177f5017b52486b930463f900da4d71', title:'00. 바로e맵 St
 const SEQ = ['#e6ecf8','#b5c7ee','#7d9de0','#4169c4','#1f3a8a'], DIV = ['#a8412e','#e3b0a3','#eceef0','#9db6e8','#1f3a8a'], NA = '#d5dade';
 const rgba = (h, a) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16), a];
 const setLegend = h => { $('legend').innerHTML = h; };
-let view, Graphic, Circle, dongLayer, spotLayer, selLayer, rentLayer, dongVal = {}, breaks = [];
+let view, Graphic, Circle, dongLayer, fineLayer, spotLayer, selLayer, rentLayer, dongVal = {}, breaks = [];
 const flyTo = (lat, lon, zoom) => { if (view) view.goTo({center:[lon, lat], zoom}, {duration:550, easing:'ease-in-out'}).catch(() => {}); };
 function initMap(){
   if (typeof require === 'undefined') return setLegend('지도를 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.');
   require(['esri/Map','esri/views/MapView','esri/Basemap','esri/Graphic','esri/layers/GraphicsLayer','esri/geometry/Circle','esri/layers/FeatureLayer'], (Map, MapView, Basemap, G, GraphicsLayer, C, FeatureLayer) => {
     Graphic = G; Circle = C;
-    dongLayer = new GraphicsLayer({visible:false}); spotLayer = new GraphicsLayer({visible:false}); selLayer = new GraphicsLayer(); rentLayer = new GraphicsLayer({visible:false});
+    dongLayer = new GraphicsLayer({visible:false}); fineLayer = new GraphicsLayer({visible:false}); spotLayer = new GraphicsLayer({visible:false}); selLayer = new GraphicsLayer(); rentLayer = new GraphicsLayer({visible:false});
     RT.areas.forEach(a => rentLayer.add(new Graphic({geometry:{type:'polygon', rings:a.rings, spatialReference:{wkid:4326}}, symbol:{type:'simple-fill', color:[0,0,0,0], outline:{color:[22,32,42,.8], width:1.3, style:'dash'}}})));
     window.DONG_GEO.features.forEach(f => { const rings = []; f.geometry.coordinates.forEach(p => p.forEach(r => rings.push(r)));
       dongLayer.add(new Graphic({geometry:{type:'polygon', rings, spatialReference:{wkid:4326}}, attributes:{c:f.properties.c}})); });
@@ -322,23 +323,25 @@ function initMap(){
     const gc = {}; for (const d of Object.keys(S.dong)){ const x = S.dong[d], e = gc[x[1]] || (gc[x[1]] = [0, 0, 0]); e[0] += x[2]; e[1] += x[3]; e[2]++; }
     const guLab = labLayer(Object.keys(gc).filter(g => S.gu[g]).map(g => [gc[g][0]/gc[g][2], gc[g][1]/gc[g][2], S.gu[g]]), 12, 'bold', 0, 100000);
     const dongLab = labLayer(Object.keys(S.dong).map(d => [S.dong[d][2], S.dong[d][3], S.dong[d][0]]), 9.5, 'normal', 100000, 0);
-    view = new MapView({container:'map', map:new Map({basemap:(BMS = {std:Basemap.fromJSON(BASEMAP), sat:Basemap.fromJSON(SATMAP)}).std, layers:[dongLayer, rentLayer, guLab, dongLab, spotLayer, selLayer]}), center:[126.99, 37.55], zoom:11, popupEnabled:false, constraints:{snapToZoom:true}});
+    view = new MapView({container:'map', map:new Map({basemap:(BMS = {std:Basemap.fromJSON(BASEMAP), sat:Basemap.fromJSON(SATMAP)}).std, layers:[dongLayer, fineLayer, rentLayer, guLab, dongLab, spotLayer, selLayer]}), center:[126.99, 37.55], zoom:11, popupEnabled:false, constraints:{snapToZoom:true}});
     dongLayer.graphics.forEach(g => { dongG[g.attributes.c] = g; });
     view.ui.components = ['zoom'];
     $('bmsw').onclick = e => { const b = e.target.closest('[data-bm]'); if (!b || b.dataset.bm === bmNow) return; bmNow = b.dataset.bm; view.map.basemap = BMS[bmNow]; document.querySelectorAll('#bmsw button').forEach(x => { const on = x.dataset.bm === bmNow; x.classList.toggle('on', on); x.setAttribute('aria-pressed', on); }); };
     view.watch('stationary', s => { if (s) loadGusInView(); });
-    view.on('click', e => { const tab = st.tab, layer = isDongTab(tab) ? dongLayer : spotLayer;
+    view.on('click', e => { const tab = st.tab, layer = fineOn() ? fineLayer : isDongTab(tab) ? dongLayer : spotLayer;
       view.hitTest(e, {include:[layer]}).then(r => { const g = r.results.length && r.results[0].graphic; if (st.tab !== tab) return;
+        if (fineOn()){ if (g){ st.fine = g.attributes.f; render(); view.goTo(g.geometry.extent.clone().expand(2.6), {duration:550, easing:'ease-in-out'}).catch(() => {}); } return; }
         if (isDongTab(tab)){ if (g){ st.dong = g.attributes.c; render(); view.goTo(g.geometry.extent.clone().expand(3.2), {duration:550, easing:'ease-in-out'}).catch(() => {}); } return; }
         if (g) return pickSpot(g.attributes.g, g.attributes.i);
         const gu = e.mapPoint && guAt(e.mapPoint.longitude, e.mapPoint.latitude); if (gu && gu !== st.gu){ st.gu = gu; $('gu').value = gu; st.cur = -1; render(); } }); });
     let busy = false;
     view.on('pointer-move', e => { if (st.tab === 'trend' || busy) return; busy = true; const tab = st.tab;
-      view.hitTest(e, {include:[isDongTab(tab) ? dongLayer : spotLayer]}).then(r => { busy = false; const g = r.results.length && r.results[0].graphic, t = $('tip');
+      view.hitTest(e, {include:[fineOn() ? fineLayer : isDongTab(tab) ? dongLayer : spotLayer]}).then(r => { busy = false; const g = r.results.length && r.results[0].graphic, t = $('tip');
         view.container.style.cursor = g ? 'pointer' : '';
-        if (isDongTab(tab)) hoverDong(g ? g.attributes.c : null, true);
+        if (isDongTab(tab) && !fineOn()) hoverDong(g ? g.attributes.c : null, true);
         if (!g){ t.style.display = 'none'; return; }
-        if (isDongTab(tab)){ const c = g.attributes.c, d = S.dong[c]; t.innerHTML = `<b>${esc(d[0])}</b> (${esc(S.gu[d[1]] || '')})<br>` + (tab === 'gent' ? STG[gd(c).stage][0] : `${MLAB[st.metric]}: ${mfmt(st.metric, dongVal[c])}`); }
+        if (fineOn()){ const u = fu(g.attributes.f); if (!u){ t.style.display = 'none'; return; } t.innerHTML = `<b>${esc(u.n)}</b> (${esc(u.t)})<br>${STG[u.stage][0]}`; }
+        else if (isDongTab(tab)){ const c = g.attributes.c, d = S.dong[c]; t.innerHTML = `<b>${esc(d[0])}</b> (${esc(S.gu[d[1]] || '')})<br>` + (tab === 'gent' ? STG[gd(c).stage][0] : `${MLAB[st.metric]}: ${mfmt(st.metric, dongVal[c])}`); }
         else { const b = GU[g.attributes.g] && GU[g.attributes.g].b[g.attributes.i]; if (!b){ t.style.display = 'none'; return; }
           const now = b[4].filter(x => !x[4]).length; t.innerHTML = `<b>${esc(b[0])}</b><br>음식점 인허가 ${b[4].length}건, 영업 중 ${now}곳`; }
         const w = $('mapwrap').clientWidth; t.style.display = 'block'; t.style.left = Math.min(e.x + 14, w - t.offsetWidth - 6) + 'px'; t.style.top = (e.y + 16) + 'px'; }, () => { busy = false; }); });
@@ -384,12 +387,12 @@ const fitRegion = () => { if (view) view.goTo(dongLayer.graphics.filter(g => DSE
 $('reg').innerHTML = S.reg.map(r => `<option value="${r[0]}">${esc(r[1])}</option>`).join('');
 $('reg').onchange = () => { st.gu = ''; st.dong = null; st.cur = -1; st.sort = null; setRegion($('reg').value); fitRegion(); render(); };
 st.cmp = []; st.cmpOpen = false;
-function stateHash(){ const o = {t:st.tab, r:st.reg, u:st.U, m:st.metric, g:st.gu, d:st.dong || '', c:st.tab === 'spot' && st.cur >= 0 ? st.cur : '', s:st.gstage || '', x:st.cmp.join('.'), o:st.cmpOpen ? 1 : ''};
+function stateHash(){ const o = {t:st.tab, r:st.reg, u:st.U, m:st.metric, g:st.gu, d:st.dong || '', c:st.tab === 'spot' && st.cur >= 0 ? st.cur : '', s:st.gstage || '', k:st.gunit === 'fine' ? 1 : '', f:st.fine || '', x:st.cmp.join('.'), o:st.cmpOpen ? 1 : ''};
   return '#' + Object.keys(o).filter(k => o[k] !== '' && o[k] != null).map(k => k + '=' + encodeURIComponent(o[k])).join('&'); }
 function applyHash(){ const q = {}; location.hash.slice(1).split('&').forEach(kv => { const i = kv.indexOf('='); if (i > 0) q[kv.slice(0, i)] = decodeURIComponent(kv.slice(i+1)); });
   if (q.r && REG[q.r]) st.reg = q.r; if (['region', 'spot', 'gent', 'trend'].includes(q.t)) st.tab = q.t;
   if (q.g && S.gu[q.g]) st.gu = q.g; if (q.d && S.dong[q.d]) st.dong = q.d; if (q.u != null && S.upt[+q.u]) st.U = +q.u; if (q.m && MLAB[q.m]) st.metric = q.m;
-  if (q.c != null && q.c !== '' && +q.c >= 0) st.cur = +q.c; if (['hot', 'rent', 'push', 'cold'].includes(q.s)) st.gstage = q.s; if (q.x) st.cmp = q.x.split('.').filter(d => S.dong[d]).slice(0, 4); st.cmpOpen = !!q.o && st.cmp.length > 0; }
+  if (q.c != null && q.c !== '' && +q.c >= 0) st.cur = +q.c; if (['hot', 'rent', 'push', 'cold'].includes(q.s)) st.gstage = q.s; if (q.k) st.gunit = 'fine'; if (q.f) st.fine = q.f; if (q.x) st.cmp = q.x.split('.').filter(d => S.dong[d]).slice(0, 4); st.cmpOpen = !!q.o && st.cmp.length > 0; }
 applyHash(); setRegion(st.reg); $('upt').value = st.U; if ($('upt').value !== String(st.U)){ st.U = -1; $('upt').value = '-1'; } $('metric').value = st.metric; if ($('metric').selectedOptions[0].disabled){ st.metric = 'surv'; $('metric').value = 'surv'; }
 $('share').onclick = () => { const b = $('share'), done = () => { b.textContent = '복사했습니다'; setTimeout(() => { b.textContent = '링크 복사'; }, 1600); }; history.replaceState(null, '', stateHash());
   if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(location.href).then(done, () => prompt('아래 주소를 복사하세요', location.href)); else prompt('아래 주소를 복사하세요', location.href); };
@@ -481,7 +484,7 @@ function render(){ document.body.className = st.tab; try { history.replaceState(
   $('reg').value = st.reg; $('gu').value = st.gu;
   $('gu').options[0].textContent = st.tab === 'spot' ? '구를 고르세요' : rName() + ' 전체';
   $('tip').style.display = 'none';
-  if (view){ dongLayer.visible = isDongTab(st.tab); spotLayer.visible = st.tab === 'spot'; rentLayer.visible = st.tab === 'spot' || st.tab === 'gent' || (st.tab === 'region' && st.metric === 'rent'); if (st.tab !== 'gent' && st.garea != null){ st.garea = null; focusArea(-1, false); } if (st.tab !== 'spot') selLayer.removeAll(); }
+  if (view){ dongLayer.visible = isDongTab(st.tab) && !fineOn(); fineLayer.visible = fineOn(); spotLayer.visible = st.tab === 'spot'; rentLayer.visible = st.tab === 'spot' || st.tab === 'gent' || (st.tab === 'region' && st.metric === 'rent'); if (st.tab !== 'gent' && st.garea != null){ st.garea = null; focusArea(-1, false); } if (st.tab !== 'spot') selLayer.removeAll(); }
   ({region:renderRegion, spot:renderSpot, trend:renderTrend, gent:renderGent})[st.tab](); }
 
 // ===== 4. 동네 변화 (뜨는 중 / 임대료 급등 / 밀려나는 중 / 식는 중)
@@ -510,7 +513,7 @@ function rentLine(a, typ){ const A = a[typ].v, B = GT.avg[a.s][typ].v, n = A.len
   return s + `</svg><div class="legend"><span><i class="ln" style="background:var(--accent)"></i>${esc(a.n)} (${GTN[typ]} 상가)</span><span><i class="ln" style="background:var(--neutral)"></i>${a.s} 평균</span><span>${GT.q[i0]} = 100</span></div>`; }
 function gSignal(label, val, p, note, inv){ const w = p == null ? 0 : Math.round(p*100), topP = p == null ? null : Math.max(1, Math.round((1-p)*100));
   return `<tr style="cursor:default"><td>${label}${note ? `<div class="sub">${note}</div>` : ''}</td><td>${val}</td><td>${p == null ? '<span class="sub">자료 없음</span>' : `<div class="rank"><div style="width:${w}%"></div></div><span class="sub">${rName()} ${topP <= 50 ? '상위 ' + topP : '하위 ' + (100-topP)}%</span>`}</td></tr>`; }
-function renderGent(){ paintGent(); const [p0, p1, r0, r1] = GT.yr;
+function renderGent(){ if (fineOn()) return renderGentFine(); paintGent(); const [p0, p1, r0, r1] = GT.yr;
   if (st.dong && S.dong[st.dong] && DSET.has(st.dong)){ const d = st.dong, g = gd(d), sg = g.stage, a = g.area != null ? GT.areas[g.area] : null, x = a && a.x;
     let h = `<div class="wrap"><button class="back" data-gback type="button">← ${esc(rName())} 전체 목록</button><h2>${esc(S.dong[d][0])} <span class="sub">${esc(S.gu[S.dong[d][1]] || '')}</span></h2>`;
     h += `<div class="gverdict"><span class="gstamp" style="color:${sg === 'calm' || sg === 'na' ? 'var(--sub)' : sg === 'hot' ? '#a86400' : STG[sg][1]}">${STG[sg][0]}</span><p>${sg === 'na' ? '최근 6년 개업이 너무 적거나 영업 중인 음식점이 20곳 미만이라 판단하지 않았습니다.' : sg === 'calm' ? '뜨는 신호, 임대료 급등, 밀려나는 신호 어느 쪽도 기준에 닿지 않았습니다.' : STG[sg][2] + '입니다.'}</p></div>`;
@@ -528,7 +531,7 @@ function renderGent(){ paintGent(); const [p0, p1, r0, r1] = GT.yr;
     $('panel').innerHTML = h; return; }
   const list = DONGS.filter(d => !st.gu || S.dong[d][1] === st.gu).map(d => [d, gd(d)]), cnt = {}; list.forEach(([, g]) => cnt[g.stage] = (cnt[g.stage] || 0) + 1);
   const scope = st.gu ? S.gu[st.gu] : rName(), shown = list.filter(([, g]) => st.gstage ? g.stage === st.gstage : g.stage !== 'calm' && g.stage !== 'na').sort((x, y) => SORDER.indexOf(x[1].stage) - SORDER.indexOf(y[1].stage) || (y[1].heat || 0) - (x[1].heat || 0));
-  let h = `<div class="wrap"><h2>동네 변화 · ${esc(scope)}</h2><div class="sub">음식점 전체 기준 · 최근 3년(${r0}~${r1})을 그 앞 3년(${p0}~${p1})과 비교 · 임대료는 ${GT.q[GT.q.length-1]}까지</div>`;
+  let h = `<div class="wrap">${unitSwitch()}<h2>동네 변화 · ${esc(scope)}</h2><div class="sub">음식점 전체 기준 · 최근 3년(${r0}~${r1})을 그 앞 3년(${p0}~${p1})과 비교 · 임대료는 ${GT.q[GT.q.length-1]}까지</div>`;
   h += `<div class="gstages">` + ['hot', 'rent', 'push', 'cold'].map(k => `<button type="button" data-gstage="${k}" class="${st.gstage === k ? 'on' : ''}" aria-pressed="${st.gstage === k}"><i style="background:${STG[k][1]}"></i><b>${STG[k][0]}</b><span class="v">${cnt[k] || 0}곳</span><span class="sub">${STG[k][2]}</span></button>`).join('') + '</div>';
   h += `<h3>${st.gstage ? STG[st.gstage][0] : '변화가 잡힌'} 동네 ${shown.length}곳 (행을 누르면 근거가 열립니다)</h3>` + (shown.length ? `<div class="scroll"><table><thead><tr><th>동네</th><th>단계</th><th>개업 증가</th><th>유행 업종</th>${gHas() ? (st.reg === 'seoul' ? '<th>유동인구</th>' : '') + '<th>매출</th>' : ''}<th>임대료 1년</th><th>오래된 가게 폐업</th></tr></thead><tbody>`
     + shown.map(([d, g]) => { const x = g.area != null && GT.areas[g.area].x; return `<tr data-dong="${d}"><td>${esc(S.dong[d][0])}${st.gu ? '' : ` <span class="sub">${esc(S.gu[S.dong[d][1]] || '')}</span>`}</td><td>${chip(g.stage)}</td><td>${spct(g.open)}</td><td>${ppf(g.trend)}</td>${gHas() ? `${st.reg === 'seoul' ? `<td>${spct(g.pop)}</td>` : ''}<td>${spct(g.sale)}</td>` : ''}<td>${x ? spct(x.c1) : '–'}</td><td>${pct(g.old)}</td></tr>`; }).join('') + '</tbody></table></div>' : '<div class="note">해당하는 동네가 없습니다.</div>');
@@ -632,7 +635,8 @@ function spotChecks({b, spot, v, sS, sN, sA, sNU, compet, R, U, near}){ const ou
     if (op + cl >= 5) out.push([op >= cl*1.3 ? 'ok' : cl >= op*1.3 ? 'warn' : 'hold', `주변 ${R}m의 최근 3년`, `최근 3년 동안 ${op}곳이 새로 열고 ${cl}곳이 닫았습니다. 지금 ${now}곳이 영업 중입니다.${op >= cl*1.3 ? ' 가게가 늘어나는 곳입니다.' : cl >= op*1.3 ? ' 가게가 줄어드는 곳입니다.' : ''}`]);
     else out.push(['info', `주변 ${R}m의 최근 3년`, `최근 3년 동안 개업 ${op}곳, 폐업 ${cl}곳으로 음식점이 드문 곳입니다. 지금 ${now}곳이 영업 중입니다.`]); }
   if (U >= 0) out.push(['info', '같은 종목 경쟁', `반경 ${R}m 안에 ${esc(S.upt[U])} ${compet}곳이 영업 중입니다${sNU.n >= MINN ? `. 이 종목의 주변 3년 생존율은 ${pct(sNU.rate)}입니다` : ''}.`]);
-  if (d && GT.d[d]){ const sg = GT.d[d].stage; if (sg !== 'na') out.push([sg === 'hot' ? 'ok' : sg === 'calm' ? 'hold' : 'warn', '동네 변화', `${esc(S.dong[d][0])}은(는) ‘${STG[sg][0]}’ 단계입니다${STG[sg][2] ? ' (' + STG[sg][2] + ')' : ''}.`]); }
+  { const fk = fineAt(b[2], b[1]), fuu = fk && fu(fk), useF = fuu && fuu.stage !== 'na', sg = useF ? fuu.stage : d && GT.d[d] ? GT.d[d].stage : 'na';
+    if (sg !== 'na') out.push([sg === 'hot' ? 'ok' : sg === 'calm' ? 'hold' : 'warn', '동네 변화', `${useF ? '이 자리가 속한 ' + esc(fuu.n) + '(' + esc(fuu.t) + ')' : esc(S.dong[d][0])}은(는) ‘${STG[sg][0]}’ 단계입니다${STG[sg][2] ? ' (' + STG[sg][2] + ')' : ''}.${useF ? '' : fuu ? ' 속한 상권은 표본이 적어 동 기준으로 봤습니다.' : ''}`]); }
   if (d){ const sl = saleAgg([d], U), bd = metricOf(null, sl, 'burden', d); if (bd != null){ burdenNote(d, sl); const med = burdenCache[st.reg + '|' + st.U];
       if (med) out.push([bd > med*1.3 ? 'warn' : bd < med*.8 ? 'ok' : 'hold', '임대료 부담', `33㎡ 가게 기준 임대료가 동네 점포당 월매출의 ${(bd*100).toFixed(1)}%입니다 (${esc(rn)} 중앙값 ${(med*100).toFixed(1)}%).`]); } }
   if (SW.s.length){ const k = Math.cos(b[1]*Math.PI/180); let best = null; for (const t of SW.s){ const dy = (t[1]-b[1])*111320, dx = (t[2]-b[2])*111320*k, m = Math.sqrt(dx*dx + dy*dy); if (!best || m < best[0]) best = [m, t]; }
@@ -642,6 +646,42 @@ function spotChecks({b, spot, v, sS, sN, sA, sNU, compet, R, U, near}){ const ou
   return out; }
 function checkCard(cs){ if (!cs.length) return ''; const L = {warn:'주의', ok:'유리', hold:'보통', info:'참고', na:'판단 보류'}, O = ['warn', 'ok', 'hold', 'info', 'na'], n = k => cs.filter(c => c[0] === k).length;
   return `<div class="checks"><div class="ch-h"><b>한눈에 보는 진단</b><span>주의 ${n('warn')} · 유리 ${n('ok')} · 보통 ${n('hold')}</span></div>` + cs.slice().sort((x, y) => O.indexOf(x[0]) - O.indexOf(y[0])).map(c => `<div class="ch ${c[0]}"><span class="ch-m">${L[c[0]]}</span><div><b>${c[1]}</b><p>${c[2]}</p></div></div>`).join('') + '</div>'; }
+
+// ===== 8. 동네 변화를 동보다 잘게: 서울은 상권, 수원·화성은 250m 칸
+const GF = window.GENTF || {u:{}}, fineG = {}; let fineReg = null;
+const fineOn = () => st.tab === 'gent' && st.gunit === 'fine', FU = () => GF.u[st.reg] || {}, fu = k => FU()[k], fineWord = () => st.reg === 'seoul' ? '상권' : '250m 칸';
+function fineBB(){ for (const rg in GF.u) for (const k in GF.u[rg]){ const u = GF.u[rg][k]; if (u.bb) return; let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; for (const r of u.g) for (const c of r){ if (c[0] < x0) x0 = c[0]; if (c[0] > x1) x1 = c[0]; if (c[1] < y0) y0 = c[1]; if (c[1] > y1) y1 = c[1]; } u.bb = [x0, y0, x1, y1]; } }
+function fineAt(lon, lat){ fineBB(); const U = FU(); for (const k in U){ const u = U[k], b = u.bb; if (lon < b[0] || lon > b[2] || lat < b[1] || lat > b[3]) continue; let ins = false;
+    for (const r of u.g) for (let i = 0, j = r.length-1; i < r.length; j = i++){ const xi = r[i][0], yi = r[i][1], xj = r[j][0], yj = r[j][1]; if ((yi > lat) !== (yj > lat) && lon < (xj-xi)*(lat-yi)/(yj-yi) + xi) ins = !ins; }
+    if (ins) return k; } return null; }
+const fineSym = (u, sel) => { const off = (st.gstage && u.stage !== st.gstage) || (st.gu && u.dong && S.dong[u.dong] && S.dong[u.dong][1] !== st.gu), base = u.stage === 'calm' ? .34 : u.stage === 'na' ? .16 : .84;
+  return {type:'simple-fill', color:rgba(STG[u.stage][1], off ? .08 : base), outline:{color: sel ? [22,32,42,1] : [255,255,255,.95], width: sel ? 2.8 : .7}}; };
+function paintFine(){ if (!view || !fineLayer) return; const U = FU();
+  if (fineReg !== st.reg){ fineLayer.removeAll(); for (const k in fineG) delete fineG[k]; fineReg = st.reg; const gs = []; for (const k in U){ const g = new Graphic({geometry:{type:'polygon', rings:U[k].g, spatialReference:{wkid:4326}}, attributes:{f:k}}); fineG[k] = g; gs.push(g); } fineLayer.addMany(gs); }
+  let top = null; for (const k in U){ const g = fineG[k]; g.symbol = fineSym(U[k], k === st.fine); if (k === st.fine) top = g; } if (top) fineLayer.graphics.reorder(top, fineLayer.graphics.length - 1);
+  const cnt = {}; for (const k in U) cnt[U[k].stage] = (cnt[U[k].stage] || 0) + 1;
+  setLegend(`<b>${esc(rName())} · ${fineWord()}별 변화</b><br>` + SORDER.filter(k => cnt[k]).map(k => `<i style="background:${STG[k][1]}"></i>${STG[k][0]} ${cnt[k]}곳`).join('<br>')); }
+const fdesc = k => ({hot:'개업이 늘고 유행 업종 비중이 커지는 ', cold:'개업이 줄고 유행 업종 비중도 낮아지는 ', rent:'임대료가 시도 평균보다 유난히 빠르게 오르는 ', push:'뜨거나 임대료가 오른 뒤, 오래된 가게의 폐업이 늘어난 '}[k] || '') + (st.reg === 'seoul' ? '상권' : '곳');
+const unitSwitch = () => `<div class="chips" role="group" aria-label="보는 단위" style="margin-bottom:12px"><button type="button" data-gunit="dong" class="${fineOn() ? '' : 'on'}">동 단위</button><button type="button" data-gunit="fine" class="${fineOn() ? 'on' : ''}">${st.reg === 'seoul' ? '상권(골목) 단위' : '250m 칸 단위'}</button></div>`;
+function renderGentFine(){ focusArea(-1, false); paintFine(); const [p0, p1, r0, r1] = GT.yr, U = FU();
+  if (st.fine && U[st.fine]){ const g = U[st.fine], sg = g.stage, a = g.area != null ? GT.areas[g.area] : null, x = a && a.x, dn = g.dong && S.dong[g.dong];
+    let h = `<div class="wrap"><button class="back" data-fback type="button">← ${esc(rName())} ${fineWord()} 목록</button><h2>${esc(g.n)} <span class="sub">${esc(g.t)}${dn ? ' · ' + esc(S.gu[dn[1]] || '') + ' ' + esc(dn[0]) : ''}</span></h2>`;
+    h += `<div class="gverdict"><span class="gstamp" style="color:${sg === 'calm' || sg === 'na' ? 'var(--sub)' : sg === 'hot' ? '#a86400' : STG[sg][1]}">${STG[sg][0]}</span><p>${sg === 'na' ? `최근 6년 개업이 15건 미만이거나 영업 중인 음식점이 20곳 미만이라 판단하지 않았습니다 (영업 중 ${num(g.now)}곳, 최근 3년 개업 ${num(g.opR)}곳).` : sg === 'calm' ? '뜨는 신호, 임대료 급등, 밀려나는 신호 어느 쪽도 기준에 닿지 않았습니다.' : fdesc(sg) + '입니다.'}</p></div>`;
+    h += `<div class="kpis">${kpi('영업 중', num(g.now) + '곳', '음식점 전체')}${kpi(`${r0}~${r1}년 개업`, num(g.opR) + '곳', `앞 3년 ${num(g.opP)}곳`)}${kpi(`${r0}~${r1}년 폐업`, num(g.clR) + '곳', g.crR != null ? `폐업률 ${pct(g.crR)}` : '')}</div>`;
+    if (sg !== 'na'){ h += `<h3>뜨는 신호 · ${r0}~${r1}년과 ${p0}~${p1}년 비교</h3><table><thead><tr><th>신호</th><th>값</th><th>${esc(rName())} ${fineWord()} 중 순위</th></tr></thead><tbody>` + gSignal('개업 증가', spct(g.open), g.p_open, `${num(g.opP)}곳 → ${num(g.opR)}곳`) + gSignal('유행 업종 비중 변화', ppf(g.trend), g.p_trend, g.trShare != null ? `최근 개업의 ${pct(g.trShare)}가 카페·디저트·양식·이국 음식` : '') + '</tbody></table>';
+      h += `<h3>밀려나는 신호</h3><table><thead><tr><th>신호</th><th>값</th><th>${esc(rName())} ${fineWord()} 중 순위</th></tr></thead><tbody>` + gSignal('3년 폐업률 변화', ppf(g.close), g.p_close, g.crP != null ? `${pct(g.crP)} → ${pct(g.crR)}` : '') + gSignal(`${GT.old}년 넘은 가게의 폐업률`, pct(g.old), g.p_old, g.oldN ? `${num(g.oldN)}곳 중 ${num(g.oldCl)}곳이 ${r0}~${r1}년에 폐업` : '') + '</tbody></table>'; }
+    if (x){ const b = GT.avg[a.s][x.t]; h += `<h3>임대료 · ${esc(a.n)} 조사 상권</h3><div class="kpis">${kpi('㎡당 월 임대료', rfmt(x.last), GTN[x.t] + ' 상가 1층')}${kpi('1년 상승률', spct(x.c1), `${a.s} 평균 ${spct(b.c1)} · 차이 ${ppf(x.x1)}`)}${kpi('3년 상승률', spct(x.c3), x.c3 == null ? '3년 전 조사값 없음' : `${a.s} 평균 ${spct(b.c3)} · 차이 ${ppf(x.x3)}`)}</div>${rentLine(a, x.t)}<div class="note">${g.rentUp ? '<b>급등 기준에 해당합니다.</b> ' : ''}임대료는 이 ${fineWord()}의 중심이 들어가는 한국부동산원 조사 상권의 값이라, 같은 조사 상권 안의 ${fineWord()}은 값이 같습니다.</div>`; }
+    else h += `<h3>임대료</h3><div class="note" style="margin-top:0">한국부동산원 조사 상권 밖이라 임대료 변화는 판단에 넣지 않았습니다.</div>`;
+    if (g.dong && S.dong[g.dong]) h += `<p style="margin-top:22px"><button class="back" data-dong="${g.dong}" data-gunit2 type="button">이 ${fineWord()}이 속한 ${esc(S.dong[g.dong][0])}의 동 단위 결과 보기 →</button></p>`;
+    h += src(FNOTE) + '</div>'; $('panel').innerHTML = h; return; }
+  const list = Object.entries(U).filter(([, g]) => !st.gu || (g.dong && S.dong[g.dong] && S.dong[g.dong][1] === st.gu)), cnt = {}; list.forEach(([, g]) => cnt[g.stage] = (cnt[g.stage] || 0) + 1);
+  const shown = list.filter(([, g]) => st.gstage ? g.stage === st.gstage : g.stage !== 'calm' && g.stage !== 'na').sort((x, y) => SORDER.indexOf(x[1].stage) - SORDER.indexOf(y[1].stage) || (y[1].heat || 0) - (x[1].heat || 0));
+  let h = `<div class="wrap">${unitSwitch()}<h2>${fineWord()}별 변화 · ${esc(st.gu ? S.gu[st.gu] : rName())}</h2><div class="sub">음식점 전체 기준 · ${fineWord()} ${list.length.toLocaleString()}곳 중 판단 가능 ${(list.length - (cnt.na || 0)).toLocaleString()}곳 · 최근 3년(${r0}~${r1})을 그 앞 3년과 비교</div>`;
+  h += `<div class="gstages">` + ['hot', 'rent', 'push', 'cold'].map(k => `<button type="button" data-gstage="${k}" class="${st.gstage === k ? 'on' : ''}" aria-pressed="${st.gstage === k}"><i style="background:${STG[k][1]}"></i><b>${STG[k][0]}</b><span class="v">${cnt[k] || 0}곳</span><span class="sub">${fdesc(k)}</span></button>`).join('') + '</div>';
+  h += `<h3>${st.gstage ? STG[st.gstage][0] : '변화가 잡힌'} ${fineWord()} ${shown.length}곳 (행을 누르면 근거가 열립니다)</h3>` + (shown.length ? `<div class="scroll" style="max-height:560px"><table><thead><tr><th>${fineWord()}</th><th>단계</th><th>영업 중</th><th>개업 증가</th><th>유행 업종</th><th>임대료 1년</th><th>오래된 가게 폐업</th></tr></thead><tbody>`
+    + shown.slice(0, 300).map(([k, g]) => { const x = g.area != null && GT.areas[g.area].x, dn = g.dong && S.dong[g.dong]; return `<tr data-fine="${k}"><td>${esc(g.n)} <span class="sub">${st.reg === 'seoul' ? esc(g.t) + (dn && !st.gu ? ' · ' + esc(S.gu[dn[1]] || '') : '') : dn ? esc(S.gu[dn[1]] || '') : ''}</span></td><td>${chip(g.stage)}</td><td>${num(g.now)}</td><td>${spct(g.open)}</td><td>${ppf(g.trend)}</td><td>${x ? spct(x.c1) : '–'}</td><td>${pct(g.old)}</td></tr>`; }).join('') + '</tbody></table></div>' + (shown.length > 300 ? `<div class="note">위에서 300곳만 보여 드립니다. 자치구를 고르면 좁혀집니다.</div>` : '') : '<div class="note">해당하는 곳이 없습니다.</div>');
+  h += src(FNOTE, '단위와 기준') + '</div>'; $('panel').innerHTML = h; }
+const FNOTE = `서울은 서울시 상권분석서비스의 상권 영역(골목상권·발달상권·전통시장, 2023년 기준)으로, 수원·화성은 ${GF.cell || 250}m 정사각형 칸으로 음식점을 묶었습니다. 판단 기준은 동 단위와 같지만 순위는 같은 도시의 상권(칸)끼리 매겼고, 뜨는 신호는 개업 증가와 유행 업종 비중 두 가지만 씁니다(유동인구·매출은 이 단위의 자료를 아직 붙이지 않았습니다). 임대료는 중심이 들어가는 한국부동산원 조사 상권의 값입니다. 구역이 작을수록 가게 몇 곳의 변화에도 결과가 달라지고, 신축 입주나 재개발 철거도 같은 신호로 잡히니 현장을 확인할 곳을 고르는 용도로 보세요. 상권 영역 밖의 음식점(서울 기록의 약 21%)은 여기에 나오지 않습니다.`;
 
 // ===== 1. 지역 찾기
 function renderRegion(){ paintDongs();
@@ -825,7 +865,7 @@ const SRCS = {
   chain: ['체인 추정', [`공식 가맹점 목록이 아니라, 지점 표시를 뗀 상호가 서울·수원·화성에 ${(window.CHAIN || {}).min || 30}곳 이상 있으면 체인으로 보았습니다`, '‘전주식당’처럼 여러 가게가 흔히 쓰는 이름은 뺐지만 일부는 섞여 있을 수 있습니다', '편의점(휴게음식점 인허가)도 포함됩니다']],
   gg: ['경기도 카드매출', ['경기데이터드림 ‘카드매출 행정동 집계’의 외식 업종 합계', '수원은 2026년 8월까지, 화성은 2025년 12월까지 있습니다', '동네 변화 탭의 매출 변화율 계산에만 썼습니다']],
   bc: ['(예시) 블록 단위 카드매출', ['2021년 블록 단위 카드매출 표본', '일부 카드사 결제분만 담은 표본이라 지금의 실제 매출을 나타내지 않습니다']] };
-const srcKeys = t => /지하철/.test(t) ? ['subway'] : /건물 정보/.test(t) ? ['bld'] : /체인/.test(t) ? ['chain', 'permit'] : /잘 버티는|나란히/.test(t) ? (st.reg === 'seoul' ? ['permit', 'people', 'sales', 'rent'] : ['permit', 'rent']) : /단계|신호/.test(t) ? (st.reg === 'seoul' ? ['permit', 'pop', 'sales', 'rent'] : ['permit', 'gg', 'rent']) : /카드매출/.test(t) ? ['bc'] : /동네 순위/.test(t) ? ['permit', 'sales', 'pop', 'rent'] : /자치구별/.test(t) ? ['permit', 'sales'] : /배후 인구|상주|직장인구/.test(t) ? ['people'] : /점포당 유동인구/.test(t) ? ['pop', 'permit'] : /임대료|공실/.test(t) ? ['rent'] : /유동인구/.test(t) ? ['pop'] : /매출/.test(t) ? ['sales'] : ['permit'];
+const srcKeys = t => fineOn() && /신호|변화|임대료/.test(t) ? ['permit', 'rent'] : /지하철/.test(t) ? ['subway'] : /건물 정보/.test(t) ? ['bld'] : /체인/.test(t) ? ['chain', 'permit'] : /잘 버티는|나란히/.test(t) ? (st.reg === 'seoul' ? ['permit', 'people', 'sales', 'rent'] : ['permit', 'rent']) : /단계|신호/.test(t) ? (st.reg === 'seoul' ? ['permit', 'pop', 'sales', 'rent'] : ['permit', 'gg', 'rent']) : /카드매출/.test(t) ? ['bc'] : /동네 순위/.test(t) ? ['permit', 'sales', 'pop', 'rent'] : /자치구별/.test(t) ? ['permit', 'sales'] : /배후 인구|상주|직장인구/.test(t) ? ['people'] : /점포당 유동인구/.test(t) ? ['pop', 'permit'] : /임대료|공실/.test(t) ? ['rent'] : /유동인구/.test(t) ? ['pop'] : /매출/.test(t) ? ['sales'] : ['permit'];
 const srcBox = keys => `<div class="srcbox">${keys.map(k => `<b>${SRCS[k][0]}</b><ul>${SRCS[k][1].map(x => `<li>${x}</li>`).join('')}</ul>`).join('')}</div>`;
 function addSrcButtons(){ for (const el of $('panel').querySelectorAll('h3, details.fold>summary, .kpi .l')){ if (el.querySelector('.srcb')) continue;
     const k = srcKeys(el.textContent), kp = el.classList.contains('l'), b = document.createElement('button'); b.type = 'button'; b.className = 'srcb' + (kp ? ' mini' : ''); b.dataset.src = k.join(','); b.textContent = kp ? 'i' : '출처'; b.title = '어디서 가져온 자료인지 보기'; b.setAttribute('aria-label', '자료 출처 보기'); el.classList.add('hsrc'); el.appendChild(b); }
@@ -839,12 +879,15 @@ $('panel').addEventListener('click', e => { let t;
   if ((t = e.target.closest('[data-sort]'))){ st.sort = t.dataset.sort; return render(); }
   if ((t = e.target.closest('[data-cmp]'))){ const d = t.dataset.cmp, i = st.cmp.indexOf(d); if (i >= 0) st.cmp.splice(i, 1); else if (st.cmp.length < 4) st.cmp.push(d); else return void alert('비교는 4곳까지 담을 수 있습니다.'); if (!st.cmp.length) st.cmpOpen = false; const y = $('panel').scrollTop; render(); $('panel').scrollTop = y; return; }
   if ((t = e.target.closest('[data-cmpopen]'))){ st.cmpOpen = t.dataset.cmpopen === '1'; render(); if (st.cmpOpen) zoomDongs(st.cmp); $('panel').scrollTop = 0; return; }
-  if ((t = e.target.closest('[data-gstage]'))){ st.gstage = st.gstage === t.dataset.gstage ? '' : t.dataset.gstage; st.garea = null; render(); if (st.gstage) zoomDongs(DONGS.filter(d => gd(d).stage === st.gstage && (!st.gu || S.dong[d][1] === st.gu))); else fitRegion(); return; }
+  if ((t = e.target.closest('[data-gunit]'))){ st.gunit = t.dataset.gunit; st.fine = null; st.dong = null; st.gstage = ''; st.garea = null; render(); fitRegion(); return; }
+  if ((t = e.target.closest('[data-fine]'))){ st.fine = t.dataset.fine; const u = fu(st.fine); render(); if (u && view){ const g = fineG[st.fine]; if (g) view.goTo(g.geometry.extent.clone().expand(2.6), {duration:600, easing:'ease-in-out'}).catch(() => {}); } $('panel').scrollTop = 0; return; }
+  if ((t = e.target.closest('[data-fback]'))){ st.fine = null; render(); return; }
+  if ((t = e.target.closest('[data-gstage]'))){ st.gstage = st.gstage === t.dataset.gstage ? '' : t.dataset.gstage; st.garea = null; render(); if (fineOn()) return; if (st.gstage) zoomDongs(DONGS.filter(d => gd(d).stage === st.gstage && (!st.gu || S.dong[d][1] === st.gu))); else fitRegion(); return; }
   if ((t = e.target.closest('[data-area]'))){ const i = +t.dataset.area, y = $('panel').scrollTop; st.garea = st.garea === i ? null : i; render(); $('panel').scrollTop = y; if (st.garea != null) focusArea(i, true); return; }
   if ((t = e.target.closest('[data-gback]'))){ st.dong = null; render(); fitRegion(); return; }
   if ((t = e.target.closest('[data-goregion]'))){ st.tab = 'region'; return render(); }
   if ((t = e.target.closest('[data-spot]'))){ const d = S.dong[t.dataset.spot]; st.gu = d[1]; $('gu').value = d[1]; st.cur = -1; st.tab = 'spot'; render(); flyTo(d[2], d[3], 16); return; }
-  if ((t = e.target.closest('[data-dong]'))){ st.dong = t.dataset.dong; st.garea = null; st.cmpOpen = false; const d = S.dong[st.dong]; if (view){ if (st.tab === 'gent' && dongG[st.dong]) zoomDongs([st.dong]); else flyTo(d[2], d[3], Math.max(Math.round(view.zoom), 13)); } render(); $('panel').scrollTop = 0; return; }
+  if ((t = e.target.closest('[data-dong]'))){ st.dong = t.dataset.dong; st.garea = null; st.cmpOpen = false; if (t.hasAttribute('data-gunit2')){ st.gunit = 'dong'; st.fine = null; } const d = S.dong[st.dong]; if (view){ if (st.tab === 'gent' && dongG[st.dong]) zoomDongs([st.dong]); else flyTo(d[2], d[3], Math.max(Math.round(view.zoom), 13)); } render(); $('panel').scrollTop = 0; return; }
   if ((t = e.target.closest('[data-u]'))){ st.U = +t.dataset.u; $('upt').value = st.U; if ($('upt').value !== String(st.U)) $('upt').value = '-1'; return render(); }
   if ((t = e.target.closest('[data-gu]'))){ st.gu = t.dataset.gu; $('gu').value = st.gu; st.dong = null; st.tab = 'region'; $('gu').onchange(); return; }
   if ((t = e.target.closest('[data-f]'))){ st.floor = t.dataset.f; st.unit = '*'; return render(); }
